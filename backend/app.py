@@ -1,7 +1,10 @@
 import os
 import pickle
 import face_recognition
-from flask import Flask, jsonify
+import easyocr
+import cv2
+import numpy as np
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -37,6 +40,60 @@ class FaceRecognitionSystem:
 
 # Initialize recognition system
 face_system = FaceRecognitionSystem()
+
+# Initialize EasyOCR reader
+print("🔄 Initializing EasyOCR reader...")
+reader = easyocr.Reader(['en'], gpu=False)
+print("✅ EasyOCR reader initialized")
+
+def preprocess_image(image_data):
+    """Preprocess image for better OCR results"""
+    # Convert base64 to numpy array
+    import base64
+    from io import BytesIO
+    from PIL import Image
+    
+    if ',' in image_data:
+        image_data = image_data.split(',')[1]
+    
+    img_bytes = base64.b64decode(image_data)
+    img = Image.open(BytesIO(img_bytes))
+    img_array = np.array(img)
+    
+    # Convert to grayscale
+    gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+    
+    # Apply thresholding
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    
+    return thresh
+
+@app.route('/api/verify_document', methods=['POST'])
+def verify_document():
+    """Basic document verification endpoint - no regex yet"""
+    try:
+        data = request.get_json()
+        image_data = data.get('image')
+        
+        if not image_data:
+            return jsonify({"success": False, "error": "No image provided"}), 400
+        
+        # Preprocess image
+        processed_img = preprocess_image(image_data)
+        
+        # Extract text using OCR
+        results = reader.readtext(processed_img)
+        extracted_text = ' '.join([text[1] for text in results])
+        
+        return jsonify({
+            "success": True,
+            "text": extracted_text,
+            "message": "Document text extracted successfully"
+        })
+    
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 
 @app.route('/api/health', methods=['GET'])
 def health():
