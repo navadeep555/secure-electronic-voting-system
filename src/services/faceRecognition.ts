@@ -31,3 +31,35 @@ export function stopCamera(stream: MediaStream | null) {
         stream.getTracks().forEach(track => track.stop())
     }
 }
+
+// Verify document function
+export async function verifyDocument(imageBase64: string): Promise<{
+    success: boolean
+    text?: string
+    message?: string
+    error?: string
+}> {
+    try {
+        const response = await fetch('http://localhost:5001/api/verify_document', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ image: imageBase64 })
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Document verification failed')
+        }
+
+        return data
+    } catch (error) {
+        console.error('Document verification error:', error)
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to verify document'
+        }
+    }
+}
