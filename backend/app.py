@@ -254,6 +254,126 @@ def recognize_face():
             "message": f"Server error: {str(e)}"
         }), 500
 
+@app.route("/api/verify-document", methods=["POST"])
+def verify_document():
+    """Verify a Voter ID document and check name match"""
+    try:
+        data = request.json
+        base64_image = data.get("documentImage")
+        expected_name = data.get("name")
+        
+        expected_dob = data.get("dob")
+        
+        if not base64_image or not expected_name or not expected_dob:
+            return jsonify({"success": False, "message": "Missing image, name, or DOB"}), 400
+            
+        print(f"🔍 Verifying document for: {expected_name}, DOB: {expected_dob}")
+        
+        # Convert base64 to image
+        img_array = face_system.base64_to_image(base64_image)
+        if img_array is None:
+            return jsonify({"success": False, "message": "Invalid image format"}), 400
+            
+        # Run OCR
+        import easyocr
+        import re
+        from datetime import datetime
+        
+        reader = easyocr.Reader(['en']) 
+        result = reader.readtext(img_array)
+        
+        extracted_text = " ".join([text[1] for text in result]).upper()
+        print(f"📝 Extracted text: {extracted_text}")
+        
+        # 1. Check if it's a real Voter ID (Basic Keyword Check)
+        keywords = ["ELECTION", "COMMISSION", "INDIA", "ELECTOR", "IDENTITY", "CARD", "EPIC", "VOTER"]
+        keyword_matches = [k for k in keywords if k in extracted_text]
+        
+        is_valid_id = len(keyword_matches) >= 2 # At least 2 keywords must match
+        
+        # 2. Check Name Match
+        input_name = expected_name.upper().strip()
+        name_parts = input_name.split()
+        
+        name_match = False
+        if input_name in extracted_text:
+            name_match = True
+        else:
+            if len(name_parts) >= 2:
+                if name_parts[0] in extracted_text and name_parts[-1] in extracted_text:
+                    name_match = True
+
+        # 3. Check DOB Match
+        # expected_dob comes as YYYY-MM-DD from HTML date input
+        dob_match = False
+        try:
+            # Parse input DOB
+            dob_obj = datetime.strptime(expected_dob, "%Y-%m-%d")
+            
+            # Formats to look for in OCR text
+            # DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+            date_patterns = [
+                dob_obj.strftime("%d/%m/%Y"),
+                dob_obj.strftime("%d-%m-%Y"),
+                dob_obj.strftime("%d.%m.%Y"),
+                # Sometimes spaces instead of separators
+                dob_obj.strftime("%d %m %Y"),
+                # Year only check (fallback) if full date fails? Maybe too lenient. Let's stick to full date first.
+            ]
+            
+            print(f"📅 Looking for DOB patterns: {date_patterns}")
+            
+            # Simple substring search for these patterns
+            for pattern in date_patterns:
+                if pattern in extracted_text:
+                    dob_match = True
+                    break
+                    
+            # Regex search for the specific date if simple match fails (handles spacing issues)
+            if not dob_match:
+                # Construct regex: DD followed by separator followed by MM...
+                d, m, y = dob_obj.strftime("%d"), dob_obj.strftime("%m"), dob_obj.strftime("%Y")
+                # pattern: d \D? m \D? y (digits with optional non-digit separator)
+                regex_pattern = f"{d}[\\/\\-\\.\\s]+{m}[\\/\\-\\.\\s]+{y}"
+                if re.search(regex_pattern, extracted_text):
+                    dob_match = True
+
+        except Exception as e:
+            print(f"⚠️ Date parsing error: {e}")
+            # Don't fail the whole request on date parse error alone, but dob_match will be False
+
+        
+        if not is_valid_id:
+            return jsonify({
+                "success": False, 
+                "message": "Could not verify this as a valid Voter ID card. Please ensure the image is clear."
+            })
+            
+        if not name_match:
+            return jsonify({
+                "success": False, 
+                "message": f"Name mismatch. Expected '{expected_name}' but could not find it clearly on the document."
+            })
+
+        if not dob_match:
+             return jsonify({
+                "success": False, 
+                "message": f"Date of Birth mismatch. Expected '{expected_dob}' (or similar format) on the document."
+            })
+            
+        return jsonify({
+            "success": True,
+            "message": "✅ Document (Name & DOB) verified successfully!",
+            "extracted_text": extracted_text[:100] + "..." 
+        })
+    
+    except Exception as e:
+        print(f"❌ Verification error: {e}")
+        return jsonify({
+            "success": False,
+            "message": f"Verification error: {str(e)}"
+        }), 500
+
 @app.route("/api/users", methods=["GET"])
 def get_users():
     """Get list of registered users"""
@@ -282,13 +402,13 @@ def get_users():
 def health():
     """Health check endpoint"""
     return jsonify({
-        "status": "✅ Face Recognition Server is Running",
+        "status": "✅ Face Recognition + Document Verification Server is Running",
         "registered_users": len(face_system.known_names),
         "timestamp": datetime.now().isoformat()
     })
 
 if __name__ == "__main__":
-    print("🚀 Starting Face Recognition Server...")
+    print("🚀 Starting Face & Document Verification Server...")
     print("📍 Server running on http://localhost:5001")
     print("⚠️  Make sure to install dependencies: pip install -r requirements.txt")
     app.run(debug=True, port=5001, host="0.0.0.0")

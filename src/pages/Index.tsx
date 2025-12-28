@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { motion, useScroll, useTransform, useInView, useMotionValue, useSpring } from "framer-motion";
+import { motion, useScroll, useTransform, useInView, useMotionValue, Variants } from "framer-motion";
 import { useRef, useEffect, useState } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { PageWrapper } from "@/components/PageWrapper";
@@ -20,6 +20,7 @@ import {
   Zap,
   Sparkles,
   Check,
+  LucideIcon,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════════
@@ -29,12 +30,12 @@ import {
 // Scroll-Triggered 3D Transform Hook - Parallax + 3D rotation
 function use3DScroll(ref: React.RefObject<HTMLElement>) {
   const { scrollYProgress } = useScroll({ target: ref });
-  
+
   const rotateX = useTransform(scrollYProgress, [0, 1], [15, -15]);
   const rotateY = useTransform(scrollYProgress, [0, 1], [-30, 30]);
   const scale = useTransform(scrollYProgress, [0, 0.5, 1], [0.6, 1, 1.15]);
   const z = useTransform(scrollYProgress, [0, 1], [-500, 500]);
-  
+
   return { rotateX, rotateY, scale, z };
 }
 
@@ -49,24 +50,24 @@ function useParallax(ref: React.RefObject<HTMLElement>, speed = 0.5) {
 function useMouseTilt() {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
-  
+
   const handleMouseMove = (e: React.MouseEvent<HTMLElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const centerX = rect.width / 2;
     const centerY = rect.height / 2;
-    
+
     const rotX = ((e.clientY - rect.top - centerY) / centerY) * 15;
     const rotY = ((e.clientX - rect.left - centerX) / centerX) * 15;
-    
+
     x.set(rotY);
     y.set(rotX);
   };
-  
+
   const handleMouseLeave = () => {
     x.set(0);
     y.set(0);
   };
-  
+
   return { x, y, handleMouseMove, handleMouseLeave };
 }
 
@@ -90,7 +91,7 @@ function LiquidBlobComponent() {
         }}
         transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
       />
-      
+
       {/* Main flowing blob 2 */}
       <motion.div
         className="absolute w-96 h-96 rounded-full blur-3xl opacity-50"
@@ -107,7 +108,7 @@ function LiquidBlobComponent() {
         }}
         transition={{ duration: 14, repeat: Infinity, ease: "easeInOut", delay: 1 }}
       />
-      
+
       {/* Secondary blob 3 - Cyan accent */}
       <motion.div
         className="absolute w-64 h-64 rounded-full blur-3xl opacity-40"
@@ -160,7 +161,7 @@ function KineticText({ text, className = "" }: { text: string; className?: strin
 // Animated Letters Component - Creative text animation
 function AnimatedText({ text, className = "" }: { text: string; className?: string }) {
   const words = text.split(" ");
-  
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -172,7 +173,7 @@ function AnimatedText({ text, className = "" }: { text: string; className?: stri
     },
   };
 
-  const wordVariants: any = {
+  const wordVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
     visible: (index: number) => ({
       opacity: 1,
@@ -337,7 +338,7 @@ export default function Index() {
   const heroRef = useRef(null);
   const featuresRef = useRef(null);
   const statsRef = useRef(null);
-  
+
   const { scrollYProgress } = useScroll({ target: scrollRef });
   const heroScroll = useScroll({ target: heroRef });
   const heroParallax = useParallax(heroRef, 0.5);
@@ -480,9 +481,9 @@ export default function Index() {
                 transition={{ duration: 1, delay: 0.7 }}
               >
                 Cast your vote from anywhere with{" "}
-                <motion.span 
+                <motion.span
                   className="text-cyan-300 font-bold"
-                  animate={{ 
+                  animate={{
                     textShadow: [
                       "0 0 10px rgba(34, 211, 238, 0.5)",
                       "0 0 20px rgba(34, 211, 238, 1)",
@@ -494,9 +495,9 @@ export default function Index() {
                   military-grade security
                 </motion.span>{" "}
                 and{" "}
-                <motion.span 
+                <motion.span
                   className="text-blue-300 font-bold"
-                  animate={{ 
+                  animate={{
                     textShadow: [
                       "0 0 10px rgba(147, 197, 253, 0.5)",
                       "0 0 20px rgba(147, 197, 253, 1)",
@@ -560,7 +561,7 @@ export default function Index() {
             animate={{ y: [0, 20, 0] }}
             transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
           >
-            <motion.div 
+            <motion.div
               className="w-8 h-12 border-2 border-blue-500/50 rounded-full flex justify-center"
               animate={{
                 borderColor: [
@@ -618,13 +619,13 @@ export default function Index() {
                         backgroundColor: "rgba(30, 58, 138, 0.1)",
                       }}
                     >
-                    <motion.div
-                      className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center flex-shrink-0"
-                      whileHover={{ scale: 1.1, rotate: 10 }}
-                    >
-                      <Icon className="h-6 w-6 text-blue-400" />
-                    </motion.div>
-                    <span className="text-sm font-bold text-white drop-shadow-md">{point.label}</span>
+                      <motion.div
+                        className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center flex-shrink-0"
+                        whileHover={{ scale: 1.1, rotate: 10 }}
+                      >
+                        <Icon className="h-6 w-6 text-blue-400" />
+                      </motion.div>
+                      <span className="text-sm font-bold text-white drop-shadow-md">{point.label}</span>
                     </motion.div>
                   </motion.div>
                 );
@@ -690,70 +691,14 @@ export default function Index() {
                 },
               }}
             >
-              {features.map((feature, i) => {
-                const Icon = feature.icon;
-                const tilt = useMouseTilt();
-                
-                return (
-                  <motion.div
-                    key={i}
-                    variants={{
-                      hidden: { opacity: 0, y: 30 },
-                      visible: { opacity: 1, y: 0, transition: { duration: 0.8 } },
-                    }}
-                    className="group"
-                  >
-                    <motion.div
-                      className={`h-full p-8 rounded-2xl border border-neutral-700/50 bg-gradient-to-br ${feature.color} to-neutral-800/50 backdrop-blur-sm overflow-hidden relative cursor-pointer`}
-                      onMouseMove={tilt.handleMouseMove}
-                      onMouseLeave={tilt.handleMouseLeave}
-                      style={{
-                        rotateX: tilt.y,
-                        rotateY: tilt.x,
-                        transformStyle: "preserve-3d",
-                      }}
-                      whileHover={{
-                        borderColor: `${colors.primary[500]}80`,
-                        boxShadow: `0 20px 50px ${colors.primary[500]}30`,
-                        scale: 1.05,
-                      }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      {/* Hover glow background */}
-                      <motion.div
-                        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                        style={{
-                          background: `radial-gradient(circle at 50% 0%, ${colors.primary[500]}20, transparent 80%)`,
-                        }}
-                      />
-
-                      <div className="relative z-10">
-                        {/* Icon with rotation microinteraction */}
-                        <motion.div
-                          className="w-14 h-14 rounded-lg bg-gradient-to-br from-blue-500/30 to-purple-500/20 flex items-center justify-center mb-6"
-                          whileHover={{
-                            scale: 1.2,
-                            rotate: -15,
-                            boxShadow: `0 0 30px ${colors.primary[500]}`,
-                          }}
-                          transition={{ type: "spring", stiffness: 200 }}
-                        >
-                          <Icon className="h-7 w-7 text-blue-400" />
-                        </motion.div>
-
-                        {/* Title */}
-                        <h3 className="text-xl font-bold text-white mb-4 drop-shadow-md">{feature.title}</h3>
-
-                        {/* Description */}
-                        <p className="text-white font-medium leading-relaxed drop-shadow-sm">{feature.description}</p>
-                      </div>
-                    </motion.div>
-                  </motion.div>
-                );
-              })}
+              {features.map((feature, i) => (
+                <FeatureCard key={i} feature={feature} />
+              ))}
             </motion.div>
           </div>
         </section>
+
+
 
         {/* ════════════════════════════════════════════════════════════ */}
         {/* 4️⃣ "HOW IT WORKS" - SCROLL-TRIGGERED KINETIC ANIMATION */}
@@ -816,11 +761,11 @@ export default function Index() {
                   key={i}
                   variants={{
                     hidden: { opacity: 0, x: -20, rotateY: -45 },
-                    visible: { 
-                      opacity: 1, 
-                      x: 0, 
+                    visible: {
+                      opacity: 1,
+                      x: 0,
                       rotateY: 0,
-                      transition: { duration: 0.8, ease: "easeOut" } 
+                      transition: { duration: 0.8, ease: "easeOut" }
                     },
                   }}
                   className="relative"
@@ -949,11 +894,11 @@ export default function Index() {
                   key={i}
                   variants={{
                     hidden: { opacity: 0, scale: 0.6, rotateY: -45 },
-                    visible: { 
-                      opacity: 1, 
-                      scale: 1, 
+                    visible: {
+                      opacity: 1,
+                      scale: 1,
                       rotateY: 0,
-                      transition: { duration: 0.8, type: "spring", stiffness: 100 } 
+                      transition: { duration: 0.8, type: "spring", stiffness: 100 }
                     },
                   }}
                   style={{ perspective: 1000 }}
@@ -988,7 +933,7 @@ export default function Index() {
                       <AnimatedCounter value={parseInt(stat.value)} />
                       {stat.value.replace(/[0-9]/g, "")}
                     </motion.div>
-                    <motion.p 
+                    <motion.p
                       className="text-white font-bold drop-shadow-md"
                       animate={{
                         color: [
@@ -1067,7 +1012,7 @@ export default function Index() {
                 Ready to Secure Your Vote?
               </motion.h2>
 
-              <motion.p 
+              <motion.p
                 className="text-xl text-white font-semibold mb-10 max-w-2xl mx-auto leading-relaxed drop-shadow-md"
                 animate={{
                   opacity: [1, 0.9, 1],
@@ -1144,7 +1089,69 @@ export default function Index() {
             </motion.div>
           </div>
         </section>
-      </Layout>
-    </PageWrapper>
+      </Layout >
+    </PageWrapper >
+  );
+}
+
+// Feature Card Component to handle hook rules
+function FeatureCard({ feature }: { feature: { icon: LucideIcon; title: string; description: string; color: string } }) {
+  const Icon = feature.icon;
+  const tilt = useMouseTilt();
+
+  return (
+    <motion.div
+      variants={{
+        hidden: { opacity: 0, y: 30 },
+        visible: { opacity: 1, y: 0, transition: { duration: 0.8 } },
+      }}
+      className="group"
+    >
+      <motion.div
+        className={`h-full p-8 rounded-2xl border border-neutral-700/50 bg-gradient-to-br ${feature.color} to-neutral-800/50 backdrop-blur-sm overflow-hidden relative cursor-pointer`}
+        onMouseMove={tilt.handleMouseMove}
+        onMouseLeave={tilt.handleMouseLeave}
+        style={{
+          rotateX: tilt.y,
+          rotateY: tilt.x,
+          transformStyle: "preserve-3d",
+        }}
+        whileHover={{
+          borderColor: `${colors.primary[500]}80`,
+          boxShadow: `0 20px 50px ${colors.primary[500]}30`,
+          scale: 1.05,
+        }}
+        transition={{ duration: 0.3 }}
+      >
+        {/* Hover glow background */}
+        <motion.div
+          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+          style={{
+            background: `radial-gradient(circle at 50% 0%, ${colors.primary[500]}20, transparent 80%)`,
+          }}
+        />
+
+        <div className="relative z-10">
+          {/* Icon with rotation microinteraction */}
+          <motion.div
+            className="w-14 h-14 rounded-lg bg-gradient-to-br from-blue-500/30 to-purple-500/20 flex items-center justify-center mb-6"
+            whileHover={{
+              scale: 1.2,
+              rotate: -15,
+              boxShadow: `0 0 30px ${colors.primary[500]}`,
+            }}
+            transition={{ type: "spring", stiffness: 200 }}
+          >
+            <Icon className="h-7 w-7 text-blue-400" />
+          </motion.div>
+
+          {/* Title */}
+          <h3 className="text-xl font-bold text-white mb-4 drop-shadow-md">{feature.title}</h3>
+
+          {/* Description */}
+          <p className="text-white font-medium leading-relaxed drop-shadow-sm">{feature.description}</p>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }

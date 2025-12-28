@@ -13,7 +13,7 @@ import {
   Zap,
 } from "lucide-react";
 import * as faceapi from "face-api.js";
-import { registerUserFaces } from "@/services/faceRecognition";
+import { registerUserFaces, verifyDocument } from "@/services/faceRecognition";
 
 // Indian States & Union Territories (same as before)
 const INDIAN_STATES = [
@@ -104,6 +104,7 @@ interface DocumentUpload {
   voterIdFile: File | null;
   aadhaarPreview: string;
   voterIdPreview: string;
+  voterIdVerified: boolean;
 }
 
 interface BiometricData {
@@ -128,7 +129,11 @@ export default function Register() {
     voterIdFile: null,
     aadhaarPreview: "",
     voterIdPreview: "",
+    voterIdVerified: false,
   });
+
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationError, setVerificationError] = useState("");
 
   const [biometricData, setBiometricData] = useState<BiometricData>({
     stage1Captured: false,
@@ -542,7 +547,7 @@ export default function Register() {
   };
 
   const validateStep2 = (): boolean => {
-    return documentUpload.aadhaarFile !== null && documentUpload.voterIdFile !== null;
+    return documentUpload.aadhaarFile !== null && documentUpload.voterIdFile !== null && documentUpload.voterIdVerified;
   };
 
   const handleNextStep = () => {
@@ -609,19 +614,44 @@ export default function Register() {
     return `XXXX XXXX ${digits.slice(-4)}`;
   };
 
-  const handleFileUpload = (
+  const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
     field: "aadhaarFile" | "voterIdFile"
   ) => {
     const file = event.target.files?.[0];
     if (file && file.size <= 5 * 1024 * 1024) {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
+        const base64Image = e.target?.result as string;
+
         setDocumentUpload((prev) => ({
           ...prev,
           [field]: file,
-          [field === "aadhaarFile" ? "aadhaarPreview" : "voterIdPreview"]: e.target?.result as string,
+          [field === "aadhaarFile" ? "aadhaarPreview" : "voterIdPreview"]: base64Image,
+          // Reset verification if re-uploading voter ID
+          ...(field === "voterIdFile" ? { voterIdVerified: false } : {}),
         }));
+
+        // Trigger verification for Voter ID
+        if (field === "voterIdFile") {
+          setIsVerifying(true);
+          setVerificationError("");
+
+          try {
+            const result = await verifyDocument(base64Image, personalInfo.fullName, personalInfo.dateOfBirth);
+
+            if (result.success) {
+              setDocumentUpload(prev => ({ ...prev, voterIdVerified: true }));
+            } else {
+              setVerificationError(result.message);
+              // Optional: Clear file if invalid? Or just let user try again
+            }
+          } catch (err) {
+            setVerificationError("Verification failed due to network error.");
+          } finally {
+            setIsVerifying(false);
+          }
+        }
       };
       reader.readAsDataURL(file);
     } else {
@@ -944,6 +974,21 @@ export default function Register() {
                               <CheckCircle2 className="h-5 w-5" />
                               {documentUpload.voterIdFile.name}
                             </p>
+                            {isVerifying && (
+                              <p className="text-yellow-400 text-sm font-semibold flex items-center justify-center gap-2 animate-pulse">
+                                <Zap className="h-4 w-4" /> Verifying Document...
+                              </p>
+                            )}
+                            {!isVerifying && documentUpload.voterIdVerified && (
+                              <p className="text-blue-400 text-sm font-semibold flex items-center justify-center gap-2">
+                                <CheckCircle2 className="h-4 w-4" /> Verification Successful
+                              </p>
+                            )}
+                            {!isVerifying && verificationError && (
+                              <p className="text-red-400 text-sm font-semibold flex items-center justify-center gap-2">
+                                <AlertCircle className="h-4 w-4" /> {verificationError}
+                              </p>
+                            )}
                           </div>
                         ) : (
                           <div className="space-y-3">

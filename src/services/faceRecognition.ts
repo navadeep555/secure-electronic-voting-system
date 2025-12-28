@@ -11,7 +11,7 @@ export interface FaceRecognitionResult {
   matched_user?: string;
   distance?: number;
   tolerance?: number;
-  all_matches?: Record<string, any>;
+  all_matches?: Record<string, { min_distance: number; avg_distance: number; stages_matched: number }>;
 }
 
 export interface RegistrationResult {
@@ -147,9 +147,47 @@ export async function checkFaceServerHealth() {
   }
 }
 
+/**
+ * Verify a Voter ID document
+ */
+export async function verifyDocument(
+  documentImage: string, // base64 image
+  name: string,
+  dob: string
+): Promise<{ success: boolean; message: string; extracted_text?: string }> {
+  try {
+    const response = await fetch(`${FACE_API_URL}/verify-document`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        documentImage,
+        name,
+        dob,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log("📝 Verification result:", result);
+    return result;
+  } catch (error) {
+    console.error("❌ Verification error:", error);
+    return {
+      success: false,
+      message: `Verification failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+    };
+  }
+}
+
 export default {
   registerUserFaces,
   recognizeUserFace,
   getRegisteredUsers,
   checkFaceServerHealth,
+  verifyDocument,
 };
