@@ -6,13 +6,25 @@ import cv2
 import numpy as np
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+import logging
+from logging.handlers import RotatingFileHandler
 
 app = Flask(__name__)
 CORS(app)
 
-# Create directories for storing face data
+# Create directories for storing face data and logs
 os.makedirs("face_data", exist_ok=True)
 os.makedirs("encodings", exist_ok=True)
+os.makedirs("logs", exist_ok=True)
+
+# Configure logging with rotation
+handler = RotatingFileHandler('logs/app.log', maxBytes=10000000, backupCount=3)
+handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+app.logger.addHandler(handler)
+app.logger.setLevel(logging.INFO)
+app.logger.info('Application started')
 
 class FaceRecognitionSystem:
     def __init__(self):
