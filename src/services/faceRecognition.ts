@@ -33,13 +33,24 @@ export function stopCamera(stream: MediaStream | null) {
 }
 
 // Verify document function
-export async function verifyDocument(imageBase64: string): Promise<{
+export async function verifyDocument(
+    imageBase64: string,
+    onLoading?: (loading: boolean) => void,
+    onSuccess?: (message: string) => void,
+    onError?: (error: string) => void
+): Promise<{
     success: boolean
     text?: string
+    cleaned_text?: string
+    dob?: string
+    keywords_validated?: boolean
     message?: string
     error?: string
 }> {
     try {
+        // Set loading state
+        if (onLoading) onLoading(true)
+
         const response = await fetch('http://localhost:5001/api/verify_document', {
             method: 'POST',
             headers: {
@@ -50,16 +61,34 @@ export async function verifyDocument(imageBase64: string): Promise<{
 
         const data = await response.json()
 
+        // Clear loading state
+        if (onLoading) onLoading(false)
+
         if (!response.ok) {
-            throw new Error(data.error || 'Document verification failed')
+            const errorMsg = data.error || 'Document verification failed'
+            if (onError) onError(errorMsg)
+            throw new Error(errorMsg)
+        }
+
+        // Success message handling
+        if (onSuccess && data.message) {
+            onSuccess(data.message)
         }
 
         return data
     } catch (error) {
+        // Clear loading state
+        if (onLoading) onLoading(false)
+
         console.error('Document verification error:', error)
+        const errorMsg = error instanceof Error ? error.message : 'Failed to verify document'
+
+        // Error message handling
+        if (onError) onError(errorMsg)
+
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to verify document'
+            error: errorMsg
         }
     }
 }
