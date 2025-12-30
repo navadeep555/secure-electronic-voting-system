@@ -80,9 +80,17 @@ def preprocess_image(image_data):
     
     return thresh
 
+def clean_text(text):
+    """Remove special characters and clean text for better matching"""
+    import re
+    # Remove special characters but keep spaces and alphanumeric
+    cleaned = re.sub(r'[^a-zA-Z0-9\s/\-.]', '', text)
+    return cleaned.strip()
+
 @app.route('/api/verify_document', methods=['POST'])
 def verify_document():
-    """Basic document verification endpoint - no regex yet"""
+    """Document verification with regex patterns for DOB and keyword validation"""
+    import re
     try:
         data = request.get_json()
         image_data = data.get('image')
@@ -96,14 +104,45 @@ def verify_document():
         # Extract text using OCR
         results = reader.readtext(processed_img)
         extracted_text = ' '.join([text[1] for text in results])
+        cleaned_text = clean_text(extracted_text).upper()
+        
+        app.logger.info(f"Extracted text: {cleaned_text}")
+        
+        # Keyword validation for "ELECTION COMMISSION"
+        keywords = ["ELECTION", "COMMISSION"]
+        keyword_found = all(keyword in cleaned_text for keyword in keywords)
+        
+        if not keyword_found:
+            return jsonify({
+                "success": False,
+                "error": "Document does not appear to be a valid Voter ID",
+                "text": extracted_text
+            }), 400
+        
+        # Regex patterns for DOB (DD/MM/YYYY, DD-MM-YYYY)
+        dob_patterns = [
+            r'\b(\d{2})[/-](\d{2})[/-](\d{4})\b',  # DD/MM/YYYY or DD-MM-YYYY
+            r'\b(\d{2})\.(\d{2})\.(\d{4})\b',       # DD.MM.YYYY
+        ]
+        
+        dob_found = None
+        for pattern in dob_patterns:
+            match = re.search(pattern, extracted_text)
+            if match:
+                dob_found = match.group(0)
+                break
         
         return jsonify({
             "success": True,
             "text": extracted_text,
-            "message": "Document text extracted successfully"
+            "cleaned_text": cleaned_text,
+            "dob": dob_found,
+            "keywords_validated": keyword_found,
+            "message": "Document verified successfully"
         })
     
     except Exception as e:
+        app.logger.error(f"Document verification error: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
