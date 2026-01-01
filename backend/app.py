@@ -49,6 +49,107 @@ class FaceRecognitionSystem:
         with open("encodings/face_encodings.pkl", "wb") as f:
             pickle.dump(self.known_encodings, f)
         print("💾 Face encodings saved")
+    
+    def base64_to_image(self, base64_string):
+        """Convert base64 string to image array"""
+        import base64
+        from io import BytesIO
+        from PIL import Image
+        
+        try:
+            if ',' in base64_string:
+                base64_string = base64_string.split(',')[1]
+            
+            img_data = base64.b64decode(base64_string)
+            img = Image.open(BytesIO(img_data))
+            return np.array(img)
+        except Exception as e:
+            print(f"❌ Error converting base64 to image: {e}")
+            return None
+    
+    def get_face_encoding(self, image_array):
+        """Extract face encoding from image array"""
+        try:
+            face_locations = face_recognition.face_locations(image_array, model="hog")
+            
+            if not face_locations:
+                print("⚠️ No face found in image")
+                return None
+            
+            face_encodings = face_recognition.face_encodings(image_array, face_locations)
+            
+            if not face_encodings:
+                print("⚠️ Could not encode face")
+                return None
+            
+            return face_encodings[0]
+        except Exception as e:
+            print(f"❌ Error encoding face: {e}")
+            return None
+    
+    def recognize_face(self, base64_image, tolerance=0.6):
+        """
+        Recognize a face from a single image
+        tolerance: lower = stricter matching (0.6 is default)
+        """
+        try:
+            print("🔍 Attempting face recognition...")
+            
+            # Convert base64 to image
+            img_array = self.base64_to_image(base64_image)
+            if img_array is None:
+                return {"success": False, "message": "Could not process image"}
+            
+            # Get face encoding from the test image
+            test_encoding = self.get_face_encoding(img_array)
+            if test_encoding is None:
+                return {"success": False, "message": "No face detected in image"}
+            
+            # If no users registered, return empty
+            if not self.known_encodings:
+                return {
+                    "success": False,
+                    "message": "No registered users in database"
+                }
+            
+            # Compare against all known encodings using face_recognition.compare_faces()
+            best_match_name = None
+            best_match_distance = float('inf')
+            
+            for user_id, user_encodings in self.known_encodings.items():
+                # Calculate face distance
+                distances = face_recognition.face_distance(user_encodings, test_encoding)
+                min_distance = np.min(distances)
+                
+                # Track best match
+                if min_distance < best_match_distance:
+                    best_match_distance = min_distance
+                    best_match_name = user_id
+            
+            # Determine if it's a match based on distance threshold (0.6)
+            is_match = best_match_distance < tolerance
+            
+            result = {
+                "success": is_match,
+                "message": f"{'✅ Face matched!' if is_match else '❌ Face not recognized'}",
+                "matched_user": best_match_name if is_match else None,
+                "distance": float(best_match_distance),
+                "tolerance": tolerance
+            }
+            
+            if is_match:
+                print(f"✅ Recognized user: {best_match_name}")
+            else:
+                print(f"❌ Could not recognize face. Distance: {best_match_distance:.4f}")
+            
+            return result
+        
+        except Exception as e:
+            print(f"❌ Recognition error: {e}")
+            return {
+                "success": False,
+                "message": f"Recognition failed: {str(e)}"
+            }
 
 # Initialize recognition system
 face_system = FaceRecognitionSystem()
@@ -144,6 +245,28 @@ def verify_document():
     except Exception as e:
         app.logger.error(f"Document verification error: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/recognize_face', methods=['POST'])
+def recognize_face():
+    """Recognize a user from a single face image"""
+    try:
+        data = request.get_json()
+        base64_image = data.get('faceImage')
+        tolerance = data.get('tolerance', 0.6)
+        
+        if not base64_image:
+            return jsonify({"success": False, "message": "Missing faceImage"}), 400
+        
+        result = face_system.recognize_face(base64_image, tolerance)
+        return jsonify(result)
+    
+    except Exception as e:
+        app.logger.error(f"Face recognition error: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": f"Server error: {str(e)}"
+        }), 500
 
 
 @app.route('/api/health', methods=['GET'])
