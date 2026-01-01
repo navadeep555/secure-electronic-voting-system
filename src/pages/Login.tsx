@@ -1,11 +1,16 @@
 import { useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 export default function Login() {
+    const navigate = useNavigate()
     const videoRef = useRef<HTMLVideoElement>(null)
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [stream, setStream] = useState<MediaStream | null>(null)
     const [cameraError, setCameraError] = useState<string>('')
     const [capturedImage, setCapturedImage] = useState<string>('')
+    const [isLoading, setIsLoading] = useState(false)
+    const [loginMessage, setLoginMessage] = useState<string>('')
+    const [loginError, setLoginError] = useState<string>('')
 
     const startCamera = async () => {
         try {
@@ -42,6 +47,52 @@ export default function Login() {
         }
     }
 
+    const handleLogin = async () => {
+        if (!capturedImage) {
+            setLoginError('Please capture your face first')
+            return
+        }
+
+        setIsLoading(true)
+        setLoginError('')
+        setLoginMessage('')
+
+        try {
+            const response = await fetch('http://localhost:5001/api/recognize_face', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    faceImage: capturedImage,
+                    tolerance: 0.6
+                })
+            })
+
+            const data = await response.json()
+
+            if (data.success && data.matched_user) {
+                setLoginMessage(`Welcome back, ${data.matched_user}!`)
+
+                // Store user info in localStorage
+                localStorage.setItem('userId', data.matched_user)
+                localStorage.setItem('isAuthenticated', 'true')
+
+                // Redirect to dashboard after 1 second
+                setTimeout(() => {
+                    navigate('/dashboard')
+                }, 1000)
+            } else {
+                setLoginError(data.message || 'Face not recognized. Please try again.')
+            }
+        } catch (error) {
+            console.error('Login error:', error)
+            setLoginError('Login failed. Please try again.')
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
     return (
         <div className="login-container">
             <h1>Voter Login</h1>
@@ -60,14 +111,20 @@ export default function Login() {
                 />
 
                 {cameraError && <p className="error">{cameraError}</p>}
+                {loginError && <p className="error">{loginError}</p>}
+                {loginMessage && <p className="success">{loginMessage}</p>}
 
                 <div className="button-group">
-                    <button onClick={startCamera}>
+                    <button onClick={startCamera} disabled={isLoading}>
                         Start Camera
                     </button>
 
-                    <button onClick={captureImage} disabled={!stream}>
+                    <button onClick={captureImage} disabled={!stream || isLoading}>
                         Capture Face
+                    </button>
+
+                    <button onClick={handleLogin} disabled={!capturedImage || isLoading}>
+                        {isLoading ? 'Verifying...' : 'Login'}
                     </button>
                 </div>
 
