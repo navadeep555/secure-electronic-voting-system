@@ -27,7 +27,22 @@ app.logger.setLevel(logging.INFO)
 app.logger.info('Application started')
 
 class FaceRecognitionSystem:
+    """
+    Face Recognition System for Voter Authentication
+    
+    This class handles all face recognition operations including:
+    - Loading and saving face encodings
+    - Image preprocessing and conversion
+    - Face encoding extraction
+    - Face recognition and matching
+    
+    Attributes:
+        known_encodings (dict): Dictionary mapping user IDs to their face encodings
+        known_names (list): List of registered user IDs
+    """
+    
     def __init__(self):
+        """Initialize the face recognition system and load existing encodings"""
         self.known_encodings = {}
         self.known_names = []
         self.load_encodings()
@@ -51,7 +66,15 @@ class FaceRecognitionSystem:
         print("💾 Face encodings saved")
     
     def base64_to_image(self, base64_string):
-        """Convert base64 string to image array"""
+        """
+        Convert base64 encoded string to numpy image array
+        
+        Args:
+            base64_string (str): Base64 encoded image string (with or without data URI prefix)
+            
+        Returns:
+            numpy.ndarray: Image array in RGB format, or None if conversion fails
+        """
         import base64
         from io import BytesIO
         from PIL import Image
@@ -68,7 +91,18 @@ class FaceRecognitionSystem:
             return None
     
     def get_face_encoding(self, image_array):
-        """Extract face encoding from image array"""
+        """
+        Extract face encoding from image array (Encoding Operation)
+        
+        This method handles the encoding phase - extracting facial features
+        into a numerical representation that can be compared.
+        
+        Args:
+            image_array (numpy.ndarray): Image array in RGB format
+            
+        Returns:
+            numpy.ndarray: 128-dimensional face encoding, or None if no face found
+        """
         try:
             face_locations = face_recognition.face_locations(image_array, model="hog")
             
@@ -89,8 +123,23 @@ class FaceRecognitionSystem:
     
     def recognize_face(self, base64_image, tolerance=0.6):
         """
-        Recognize a face from a single image
-        tolerance: lower = stricter matching (0.6 is default)
+        Recognize a face from a single image (Recognition Operation)
+        
+        This method handles the recognition phase - comparing a test face
+        against all known encodings to find a match.
+        
+        Args:
+            base64_image (str): Base64 encoded image containing a face
+            tolerance (float): Distance threshold for matching (default: 0.6)
+                              Lower values = stricter matching
+                              
+        Returns:
+            dict: Recognition result containing:
+                - success (bool): Whether a match was found
+                - message (str): Human-readable result message
+                - matched_user (str|None): User ID if matched
+                - distance (float): Best match distance
+                - tolerance (float): Threshold used
         """
         try:
             print("🔍 Attempting face recognition...")
