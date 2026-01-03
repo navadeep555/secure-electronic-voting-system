@@ -1,3 +1,88 @@
+import * as faceapi from 'face-api.js'
+
+// face-api.js model loading state
+let modelsLoaded = false
+
+// Load face-api.js models
+export async function loadFaceApiModels(): Promise<boolean> {
+    if (modelsLoaded) return true
+
+    try {
+        console.log('Loading face-api.js models...')
+
+        const MODEL_URL = '/models'
+
+        await Promise.all([
+            faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+            faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+            faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+        ])
+
+        modelsLoaded = true
+        console.log('✅ face-api.js models loaded successfully')
+        return true
+    } catch (error) {
+        console.error('❌ Failed to load face-api.js models:', error)
+        return false
+    }
+}
+
+// Detect face landmarks on video stream
+export async function detectFaceLandmarks(
+    video: HTMLVideoElement
+): Promise<faceapi.WithFaceLandmarks<{ detection: faceapi.FaceDetection }> | null> {
+    try {
+        if (!modelsLoaded) {
+            await loadFaceApiModels()
+        }
+
+        const detection = await faceapi
+            .detectSingleFace(video, new faceapi.SsdMobilenetv1Options())
+            .withFaceLandmarks()
+
+        return detection || null
+    } catch (error) {
+        console.error('Face landmark detection error:', error)
+        return null
+    }
+}
+
+// Analyze head pose from landmarks
+export function analyzeHeadPose(landmarks: faceapi.FaceLandmarks68): {
+    direction: 'CENTER' | 'LEFT' | 'RIGHT' | 'UP' | 'DOWN'
+    confidence: number
+} {
+    const nose = landmarks.getNose()
+    const leftEye = landmarks.getLeftEye()
+    const rightEye = landmarks.getRightEye()
+    const mouth = landmarks.getMouth()
+
+    // Calculate face center
+    const faceCenter = {
+        x: (leftEye[0].x + rightEye[3].x) / 2,
+        y: (leftEye[0].y + rightEye[3].y) / 2
+    }
+
+    // Calculate nose position relative to face center
+    const noseX = nose[3].x - faceCenter.x
+    const noseY = nose[3].y - faceCenter.y
+
+    // Determine direction based on nose position
+    const threshold = 15
+
+    if (Math.abs(noseX) < threshold && Math.abs(noseY) < threshold) {
+        return { direction: 'CENTER', confidence: 0.9 }
+    } else if (noseX < -threshold) {
+        return { direction: 'LEFT', confidence: 0.8 }
+    } else if (noseX > threshold) {
+        return { direction: 'RIGHT', confidence: 0.8 }
+    } else if (noseY < -threshold) {
+        return { direction: 'UP', confidence: 0.8 }
+    } else {
+        return { direction: 'DOWN', confidence: 0.7 }
+    }
+}
+
 // Basic TypeScript interfaces for face data
 export interface FaceData {
     image: string
