@@ -1,5 +1,8 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { PageWrapper } from '../components/PageWrapper'
+import { staggerContainer, staggerItem } from '../lib/animations'
 
 export default function Login() {
     const navigate = useNavigate()
@@ -94,51 +97,122 @@ export default function Login() {
     }
 
     return (
-        <div className="login-container">
-            <h1>Voter Login</h1>
+        <PageWrapper>
+            <motion.div
+                className="login-container"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5 }}
+            >
+                <motion.h1
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                >
+                    Voter Login
+                </motion.h1>
 
-            <div className="camera-section">
-                <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    style={{ width: '100%', maxWidth: '640px' }}
-                />
+                <motion.div
+                    className="camera-section"
+                    variants={staggerContainer}
+                    initial="initial"
+                    animate="animate"
+                >
+                    <motion.video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        style={{ width: '100%', maxWidth: '640px' }}
+                        variants={staggerItem}
+                    />
 
-                <canvas
-                    ref={canvasRef}
-                    style={{ display: 'none' }}
-                />
+                    <canvas
+                        ref={canvasRef}
+                        style={{ display: 'none' }}
+                    />
 
-                {cameraError && <p className="error">{cameraError}</p>}
-                {loginError && <p className="error">{loginError}</p>}
-                {loginMessage && <p className="success">{loginMessage}</p>}
+                    {cameraError && (
+                        <motion.p
+                            className="error"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                        >
+                            {cameraError}
+                        </motion.p>
+                    )}
+                    {loginError && (
+                        <motion.p
+                            className="error"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                        >
+                            {loginError}
+                        </motion.p>
+                    )}
+                    {loginMessage && (
+                        <motion.p
+                            className="success"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                        >
+                            {loginMessage}
+                        </motion.p>
+                    )}
 
-                <div className="button-group">
-                    <button onClick={startCamera} disabled={isLoading}>
-                        Start Camera
-                    </button>
+                    <motion.div
+                        className="button-group"
+                        variants={staggerContainer}
+                        initial="initial"
+                        animate="animate"
+                    >
+                        <motion.button
+                            onClick={startCamera}
+                            disabled={isLoading}
+                            variants={staggerItem}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                        >
+                            Start Camera
+                        </motion.button>
 
-                    <button onClick={captureImage} disabled={!stream || isLoading}>
-                        Capture Face
-                    </button>
+                        <motion.button
+                            onClick={captureImage}
+                            disabled={!stream || isLoading}
+                            variants={staggerItem}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                        >
+                            Capture Face
+                        </motion.button>
 
-                    <button onClick={handleLogin} disabled={!capturedImage || isLoading}>
-                        {isLoading ? 'Verifying...' : 'Login'}
-                    </button>
-                </div>
+                        <motion.button
+                            onClick={handleLogin}
+                            disabled={!capturedImage || isLoading}
+                            variants={staggerItem}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                        >
+                            {isLoading ? 'Verifying...' : 'Login'}
+                        </motion.button>
+                    </motion.div>
 
-                {capturedImage && (
-                    <div className="preview">
-                        <h3>Captured Image:</h3>
-                        <img
-                            src={capturedImage}
-                            alt="Captured face"
-                            style={{ maxWidth: '400px', marginTop: '10px' }}
-                        />
-                    </div>
-                )}
-            </div>
-        </div>
+                    {capturedImage && (
+                        <motion.div
+                            className="preview"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 }}
+                        >
+                            <h3>Captured Image:</h3>
+                            <img
+                                src={capturedImage}
+                                alt="Captured face"
+                                style={{ maxWidth: '400px', marginTop: '10px' }}
+                            />
+                        </motion.div>
+                    )}
+                </motion.div>
+            </motion.div>
+        </PageWrapper>
     )
 }
