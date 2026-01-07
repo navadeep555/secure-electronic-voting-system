@@ -237,7 +237,31 @@ def clean_text(text):
     cleaned = re.sub(r'[^a-zA-Z0-9\s/\-.]', '', text)
     return cleaned.strip()
 
+from functools import wraps
+
+def validate_request(required_fields):
+    """Decorator to validate JSON request fields"""
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            if not request.is_json:
+                return jsonify({"success": False, "message": "Content-Type must be application/json"}), 400
+            
+            data = request.get_json()
+            missing = [field for field in required_fields if field not in data]
+            
+            if missing:
+                return jsonify({
+                    "success": False, 
+                    "message": f"Missing required fields: {', '.join(missing)}"
+                }), 400
+                
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
 @app.route('/api/verify_document', methods=['POST'])
+@validate_request(['image'])
 def verify_document():
     """Document verification with regex patterns for DOB and keyword validation"""
     import re
@@ -297,6 +321,7 @@ def verify_document():
 
 
 @app.route('/api/recognize_face', methods=['POST'])
+@validate_request(['faceImage'])
 def recognize_face():
     """Recognize a user from a single face image"""
     try:
