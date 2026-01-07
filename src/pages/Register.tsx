@@ -1,10 +1,37 @@
 import { useRef, useState, useEffect } from 'react'
 import { loadFaceApiModels, detectFaceLandmarks, analyzeHeadPose } from '../services/faceRecognition'
+import { PageWrapper } from '../components/PageWrapper'
+import { AnimatedContainer } from '../components/AnimatedContainer'
+import { motion } from 'framer-motion'
 
 type PoseState = 'CENTER' | 'LEFT' | 'RIGHT' | 'UP'
+type Step = 1 | 2 | 3 | 4
 
 export default function Register() {
     const videoRef = useRef<HTMLVideoElement>(null)
+    const [currentStep, setCurrentStep] = useState<Step>(1)
+    const [direction, setDirection] = useState<'left' | 'right'>('right')
+
+    // Form Data Persistance
+    const [formData, setFormData] = useState({
+        fullName: '',
+        dob: '',
+        aadhaar: '',
+        state: '',
+        district: ''
+    })
+
+    const handleNext = () => {
+        setDirection('right')
+        setCurrentStep(prev => Math.min(prev + 1, 4) as Step)
+    }
+
+    const handleBack = () => {
+        setDirection('left')
+        setCurrentStep(prev => Math.max(prev - 1, 1) as Step)
+    }
+
+    // Existing states...
     const [stream, setStream] = useState<MediaStream | null>(null)
     const [cameraError, setCameraError] = useState<string>('')
     const [documentImage, setDocumentImage] = useState<string>('')
@@ -174,48 +201,122 @@ export default function Register() {
             setUploadError('')
         }
         reader.readAsDataURL(file)
+        reader.readAsDataURL(file)
+    }
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData({
+            ...formData,
+            [e.target.name]: e.target.value
+        })
     }
 
     return (
-        <div className="register-container">
-            <h1>Voter Registration</h1>
+        <PageWrapper>
+            <div className="register-container">
+                <h1>Voter Registration - Step {currentStep} of 4</h1>
 
-            <div className="camera-section">
-                <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    style={{ width: '100%', maxWidth: '640px' }}
-                />
-
-                {cameraError && <p className="error">{cameraError}</p>}
-
-                <button onClick={startCamera}>
-                    Start Camera
-                </button>
-            </div>
-
-            <div className="document-section">
-                <h2>Upload Voter ID</h2>
-
-                <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleDocumentUpload}
-                />
-
-                {uploadError && <p className="error">{uploadError}</p>}
-
-                {documentPreview && (
-                    <div className="preview">
-                        <img
-                            src={documentPreview}
-                            alt="Document preview"
-                            style={{ maxWidth: '400px', marginTop: '10px' }}
-                        />
-                    </div>
+                {currentStep === 1 && (
+                    <AnimatedContainer slideDirection={direction}>
+                        <div className="form-group">
+                            <input
+                                name="fullName"
+                                placeholder="Full Name"
+                                value={formData.fullName}
+                                onChange={handleInputChange}
+                            />
+                            <input
+                                name="dob"
+                                type="date"
+                                placeholder="Date of Birth"
+                                value={formData.dob}
+                                onChange={handleInputChange}
+                            />
+                            <input
+                                name="aadhaar"
+                                placeholder="Aadhaar Number"
+                                value={formData.aadhaar}
+                                onChange={handleInputChange}
+                            />
+                            <input
+                                name="state"
+                                placeholder="State"
+                                value={formData.state}
+                                onChange={handleInputChange}
+                            />
+                            <input
+                                name="district"
+                                placeholder="District"
+                                value={formData.district}
+                                onChange={handleInputChange}
+                            />
+                        </div>
+                    </AnimatedContainer>
                 )}
+
+                {currentStep === 2 && (
+                    <AnimatedContainer slideDirection={direction}>
+                        <div className="document-section">
+                            <h2>Upload Voter ID</h2>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleDocumentUpload}
+                            />
+                            {uploadError && <p className="error">{uploadError}</p>}
+                            {documentPreview && (
+                                <img src={documentPreview} alt="Preview" style={{ maxWidth: '300px' }} />
+                            )}
+                        </div>
+                    </AnimatedContainer>
+                )}
+
+                {currentStep === 3 && (
+                    <AnimatedContainer slideDirection={direction}>
+                        <div className="camera-section">
+                            <h2>Liveness Check</h2>
+                            <p>{detectionMessage}</p>
+                            <video
+                                ref={videoRef}
+                                autoPlay
+                                playsInline
+                                style={{ width: '100%', maxWidth: '640px' }}
+                            />
+                            {cameraError && <p className="error">{cameraError}</p>}
+                            <div className="button-group">
+                                <button onClick={startCamera}>Start Camera</button>
+                            </div>
+                        </div>
+                    </AnimatedContainer>
+                )}
+
+                {currentStep === 4 && (
+                    <AnimatedContainer slideDirection={direction}>
+                        <div className="review-section">
+                            <h2>Review Details</h2>
+                            <p><strong>Name:</strong> {formData.fullName}</p>
+                            <p><strong>DOB:</strong> {formData.dob}</p>
+                            <p><strong>Aadhaar:</strong> {formData.aadhaar}</p>
+                            <p><strong>Address:</strong> {formData.district}, {formData.state}</p>
+                            <div className="review-images">
+                                {documentPreview && <img src={documentPreview} alt="Doc" width="100" />}
+                                {capturedPoses.CENTER && <img src={capturedPoses.CENTER} alt="Face" width="100" />}
+                            </div>
+                        </div>
+                    </AnimatedContainer>
+                )}
+
+                <div className="navigation-buttons" style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+                    {currentStep > 1 && (
+                        <button onClick={handleBack}>Back</button>
+                    )}
+                    {currentStep < 4 ? (
+                        <button onClick={handleNext}>Next</button>
+                    ) : (
+                        <button onClick={() => alert('Registration Submitted!')}>Submit</button>
+                    )}
+                </div>
             </div>
-        </div>
+        </PageWrapper>
     )
 }
