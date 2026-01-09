@@ -2,7 +2,8 @@ import { useRef, useState, useEffect } from 'react'
 import { loadFaceApiModels, detectFaceLandmarks, analyzeHeadPose } from '../services/faceRecognition'
 import { PageWrapper } from '../components/PageWrapper'
 import { AnimatedContainer } from '../components/AnimatedContainer'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
+import { CheckCircle, RefreshCw, ArrowRight, ArrowLeft, ArrowUp, Camera } from 'lucide-react'
 
 type PoseState = 'CENTER' | 'LEFT' | 'RIGHT' | 'UP'
 type Step = 1 | 2 | 3 | 4
@@ -11,6 +12,10 @@ export default function Register() {
     const videoRef = useRef<HTMLVideoElement>(null)
     const [currentStep, setCurrentStep] = useState<Step>(1)
     const [direction, setDirection] = useState<'left' | 'right'>('right')
+
+    // Gamification states
+    const [flashActive, setFlashActive] = useState(false)
+    const [showSuccess, setShowSuccess] = useState(false)
 
     // Form Data Persistance
     const [formData, setFormData] = useState({
@@ -128,6 +133,10 @@ export default function Register() {
             ctx.drawImage(videoRef.current, 0, 0)
             const imageData = canvas.toDataURL('image/jpeg')
 
+            // Trigger flash effect
+            setFlashActive(true)
+            setTimeout(() => setFlashActive(false), 200)
+
             // Save captured pose
             setCapturedPoses(prev => ({
                 ...prev,
@@ -154,8 +163,18 @@ export default function Register() {
         } else {
             // All poses captured
             stopPoseDetection()
+            setShowSuccess(true)
             setDetectionMessage('All poses captured successfully!')
         }
+    }
+
+    const resetCapture = () => {
+        setCapturedPoses({})
+        setCurrentPose('CENTER')
+        setShowSuccess(false)
+        setDetectionMessage('Look straight at the camera')
+        setIsDetecting(true)
+        startPoseDetection()
     }
 
     const stopPoseDetection = () => {
@@ -273,19 +292,84 @@ export default function Register() {
 
                 {currentStep === 3 && (
                     <AnimatedContainer slideDirection={direction}>
-                        <div className="camera-section">
+                        <div className="camera-section relative">
                             <h2>Liveness Check</h2>
-                            <p>{detectionMessage}</p>
+
+                            {/* Flash Effect */}
+                            <AnimatePresence>
+                                {flashActive && (
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 0.8 }}
+                                        exit={{ opacity: 0 }}
+                                        className="absolute inset-0 bg-white z-50 pointer-events-none"
+                                    />
+                                )}
+                            </AnimatePresence>
+
+                            {/* Success Overlay */}
+                            <AnimatePresence>
+                                {showSuccess && (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.8 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="absolute inset-0 bg-green-500/20 backdrop-blur-sm z-40 flex flex-col items-center justify-center rounded-lg"
+                                    >
+                                        <CheckCircle className="w-20 h-20 text-green-500 mb-4" />
+                                        <h3 className="text-2xl font-bold text-white mb-4">Verification Complete!</h3>
+                                        <button
+                                            onClick={resetCapture}
+                                            className="flex items-center gap-2 px-6 py-2 bg-white text-green-600 rounded-full font-bold hover:bg-green-50 transition-colors"
+                                        >
+                                            <RefreshCw className="w-4 h-4" />
+                                            Rescan
+                                        </button>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            <div className="instructions flex flex-col items-center mb-4">
+                                <motion.div
+                                    key={currentPose}
+                                    initial={{ scale: 0.8, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    className="mb-2"
+                                >
+                                    {currentPose === 'CENTER' && <Camera className="w-12 h-12 text-blue-500" />}
+                                    {currentPose === 'LEFT' && <ArrowLeft className="w-12 h-12 text-blue-500" />}
+                                    {currentPose === 'RIGHT' && <ArrowRight className="w-12 h-12 text-blue-500" />}
+                                    {currentPose === 'UP' && <ArrowUp className="w-12 h-12 text-blue-500" />}
+                                </motion.div>
+                                <p className="text-lg font-semibold text-gray-700">{detectionMessage}</p>
+                            </div>
+
                             <video
                                 ref={videoRef}
                                 autoPlay
                                 playsInline
+                                className="rounded-lg shadow-lg"
                                 style={{ width: '100%', maxWidth: '640px' }}
                             />
-                            {cameraError && <p className="error">{cameraError}</p>}
-                            <div className="button-group">
-                                <button onClick={startCamera}>Start Camera</button>
+
+                            {/* Progress Indicators */}
+                            <div className="flex gap-2 mt-4 justify-center">
+                                {['CENTER', 'LEFT', 'RIGHT', 'UP'].map((pose) => (
+                                    <div
+                                        key={pose}
+                                        className={`w-3 h-3 rounded-full ${capturedPoses[pose as PoseState] ? 'bg-green-500' :
+                                                currentPose === pose ? 'bg-blue-500 animate-pulse' : 'bg-gray-300'
+                                            }`}
+                                    />
+                                ))}
                             </div>
+
+                            {cameraError && <p className="error text-red-500 mt-2">{cameraError}</p>}
+
+                            {!stream && (
+                                <div className="button-group mt-4">
+                                    <button onClick={startCamera}>Start Camera</button>
+                                </div>
+                            )}
                         </div>
                     </AnimatedContainer>
                 )}
