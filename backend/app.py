@@ -4,6 +4,10 @@ import face_recognition
 import easyocr
 import cv2
 import numpy as np
+import base64
+from io import BytesIO
+from PIL import Image
+from queue import Queue
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import logging
@@ -45,6 +49,7 @@ class FaceRecognitionSystem:
         """Initialize the face recognition system and load existing encodings"""
         self.known_encodings = {}
         self.known_names = []
+        self.frame_queue = Queue(maxsize=10) # Image processing queue
         self.load_encodings()
     
     def load_encodings(self):
@@ -75,9 +80,6 @@ class FaceRecognitionSystem:
         Returns:
             numpy.ndarray: Image array in RGB format, or None if conversion fails
         """
-        import base64
-        from io import BytesIO
-        from PIL import Image
         
         try:
             if ',' in base64_string:
