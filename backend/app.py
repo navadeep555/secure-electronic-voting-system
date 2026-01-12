@@ -232,6 +232,15 @@ def preprocess_image(image_data):
     
     return thresh
 
+# Security Utils
+def sanitize_input(text):
+    """Sanitize input to prevent XSS and Injection"""
+    if not isinstance(text, str):
+        return text
+    # Remove potentially dangerous characters
+    import html
+    return html.escape(text)
+
 def clean_text(text):
     """Remove special characters and clean text for better matching"""
     import re
