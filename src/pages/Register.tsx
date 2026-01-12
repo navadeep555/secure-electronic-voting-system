@@ -25,8 +25,47 @@ export default function Register() {
         state: '',
         district: ''
     })
+    const [errors, setErrors] = useState<{ [key: string]: string }>({})
+
+    // Validation Functions
+    const validateAadhaar = (aadhaar: string) => {
+        // Verhoeff algorithm implementation would go here
+        // For now, checking 12 digits
+        return /^\d{12}$/.test(aadhaar)
+    }
+
+    const validateAge = (dob: string) => {
+        const today = new Date()
+        const birthDate = new Date(dob)
+        let age = today.getFullYear() - birthDate.getFullYear()
+        const m = today.getMonth() - birthDate.getMonth()
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--
+        }
+        return age >= 18
+    }
 
     const handleNext = () => {
+        // Step 1 Validation
+        if (currentStep === 1) {
+            const newErrors: { [key: string]: string } = {}
+            if (!formData.fullName) newErrors.fullName = 'Full Name is required'
+            if (!formData.dob) newErrors.dob = 'Date of Birth is required'
+            else if (!validateAge(formData.dob)) newErrors.dob = 'You must be at least 18 years old'
+
+            if (!formData.aadhaar) newErrors.aadhaar = 'Aadhaar Number is required'
+            else if (!validateAadhaar(formData.aadhaar)) newErrors.aadhaar = 'Invalid Aadhaar Number (must be 12 digits)'
+
+            if (!formData.state) newErrors.state = 'State is required'
+            if (!formData.district) newErrors.district = 'District is required'
+
+            if (Object.keys(newErrors).length > 0) {
+                setErrors(newErrors)
+                return
+            }
+            setErrors({})
+        }
+
         setDirection('right')
         setCurrentStep(prev => Math.min(prev + 1, 4) as Step)
     }
@@ -243,32 +282,47 @@ export default function Register() {
                                 placeholder="Full Name"
                                 value={formData.fullName}
                                 onChange={handleInputChange}
+                                className={errors.fullName ? 'error-input' : ''}
                             />
+                            {errors.fullName && <p className="text-red-500 text-sm mt-1">{errors.fullName}</p>}
+
                             <input
                                 name="dob"
                                 type="date"
                                 placeholder="Date of Birth"
                                 value={formData.dob}
                                 onChange={handleInputChange}
+                                className={errors.dob ? 'error-input' : ''}
                             />
+                            {errors.dob && <p className="text-red-500 text-sm mt-1">{errors.dob}</p>}
+
                             <input
                                 name="aadhaar"
                                 placeholder="Aadhaar Number"
                                 value={formData.aadhaar}
                                 onChange={handleInputChange}
+                                maxLength={12}
+                                className={errors.aadhaar ? 'error-input' : ''}
                             />
+                            {errors.aadhaar && <p className="text-red-500 text-sm mt-1">{errors.aadhaar}</p>}
+
                             <input
                                 name="state"
                                 placeholder="State"
                                 value={formData.state}
                                 onChange={handleInputChange}
+                                className={errors.state ? 'error-input' : ''}
                             />
+                            {errors.state && <p className="text-red-500 text-sm mt-1">{errors.state}</p>}
+
                             <input
                                 name="district"
                                 placeholder="District"
                                 value={formData.district}
                                 onChange={handleInputChange}
+                                className={errors.district ? 'error-input' : ''}
                             />
+                            {errors.district && <p className="text-red-500 text-sm mt-1">{errors.district}</p>}
                         </div>
                     </AnimatedContainer>
                 )}
@@ -357,7 +411,7 @@ export default function Register() {
                                     <div
                                         key={pose}
                                         className={`w-3 h-3 rounded-full ${capturedPoses[pose as PoseState] ? 'bg-green-500' :
-                                                currentPose === pose ? 'bg-blue-500 animate-pulse' : 'bg-gray-300'
+                                            currentPose === pose ? 'bg-blue-500 animate-pulse' : 'bg-gray-300'
                                             }`}
                                     />
                                 ))}
@@ -380,7 +434,7 @@ export default function Register() {
                             <h2>Review Details</h2>
                             <p><strong>Name:</strong> {formData.fullName}</p>
                             <p><strong>DOB:</strong> {formData.dob}</p>
-                            <p><strong>Aadhaar:</strong> {formData.aadhaar}</p>
+                            <p><strong>Aadhaar:</strong> {formData.aadhaar.replace(/(\d{4})\d{4}(\d{4})/, '$1 XXXX $2')}</p>
                             <p><strong>Address:</strong> {formData.district}, {formData.state}</p>
                             <div className="review-images">
                                 {documentPreview && <img src={documentPreview} alt="Doc" width="100" />}
