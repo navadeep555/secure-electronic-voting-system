@@ -354,6 +354,51 @@ def recognize_face():
         }), 500
 
 
+@app.route('/api/users/<user_id>', methods=['GET'])
+def get_user_profile(user_id):
+    """Get user profile details"""
+    try:
+        import json
+        if not os.path.exists('users.json'):
+            return jsonify({"success": False, "message": "User database not found"}), 404
+            
+        with open('users.json', 'r') as f:
+            data = json.load(f)
+            
+        user = next((u for u in data.get('users', []) if u['id'] == user_id), None)
+        
+        if not user:
+            return jsonify({"success": False, "message": "User not found"}), 404
+            
+        return jsonify({
+            "success": True,
+            "user": user
+        })
+    except Exception as e:
+        app.logger.error(f"Error fetching user profile: {str(e)}")
+        return jsonify({"success": False, "message": "Server error"}), 500
+
+@app.route('/api/elections', methods=['GET'])
+def get_elections():
+    """Get upcoming elections (Mock Data)"""
+    elections = [
+        {
+            "id": "E001",
+            "title": "General Election 2026",
+            "date": "2026-05-15",
+            "status": "upcoming",
+            "description": "National parliamentary elections"
+        },
+        {
+            "id": "E002",
+            "title": "State Assembly Election",
+            "date": "2026-03-10",
+            "status": "upcoming",
+            "description": "State legislative assembly elections"
+        }
+    ]
+    return jsonify({"success": True, "elections": elections})
+
 @app.route('/api/health', methods=['GET'])
 def health():
     return jsonify({"status": "Server is running"})
