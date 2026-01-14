@@ -30,17 +30,35 @@ echo "📁 Creating directories..."
 mkdir -p face_data
 mkdir -p encodings
 
+# Create sample user data
+echo "📝 Creating sample user data..."
+cat > users.json << END
+{
+  "users": [
+    {
+      "id": "USER001",
+      "name": "Demo User",
+      "email": "demo@securevote.com",
+      "role": "voter",
+      "status": "verified",
+      "aadhaar": "1234 5678 9012"
+    }
+  ]
+}
+END
+
+# Create backup script
+echo "🛡️ Creating backup script..."
+cat > backup_users.sh << 'BACKUP'
+#!/bin/bash
+timestamp=$(date +%Y%m%d_%H%M%S)
+cp encodings/face_encodings.pkl "encodings/backup_${timestamp}.pkl" 2>/dev/null || echo "No encodings to backup"
+if [ -f users.json ]; then
+    cp users.json "users_backup_${timestamp}.json"
+fi
+echo "✅ Backup complete: ${timestamp}"
+BACKUP
+chmod +x backup_users.sh
+
 echo ""
 echo "✅ Setup complete!"
-echo ""
-echo "To start the server, run:"
-echo "  source venv/bin/activate"
-echo "  python app.py"
-echo ""
-echo "The API will be available at http://localhost:5000"
-echo ""
-echo "📚 API Endpoints:"
-echo "  POST /api/register-face - Register a user with 4 biometric faces"
-echo "  POST /api/recognize-face - Recognize a user from a single face image"
-echo "  GET  /api/users - Get list of registered users"
-echo "  GET  /api/health - Health check"
