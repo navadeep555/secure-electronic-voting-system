@@ -281,14 +281,37 @@ def verify_document():
         image_data = data.get('image')
         
         if not image_data:
-            return jsonify({"success": False, "error": "No image provided"}), 400
+            return jsonify({
+                "success": False, 
+                "error": "No image provided",
+                "code": "MISSING_IMAGE"
+            }), 400
         
         # Preprocess image
-        processed_img = preprocess_image(image_data)
+        try:
+            processed_img = preprocess_image(image_data)
+        except Exception as e:
+            app.logger.error(f"Image preprocessing failed: {e}")
+            return jsonify({
+                "success": False,
+                "error": "Invalid image format",
+                "code": "INVALID_IMAGE"
+            }), 400
         
         # Extract text using OCR
-        results = reader.readtext(processed_img)
-        extracted_text = ' '.join([text[1] for text in results])
+        try:
+            results = reader.readtext(processed_img)
+            if not results:
+                raise Exception("No text detected")
+            extracted_text = ' '.join([text[1] for text in results])
+        except Exception as e:
+            app.logger.error(f"OCR Extraction failed: {e}")
+            return jsonify({
+                "success": False,
+                "error": "Failed to read text from document",
+                "code": "OCR_FAILED"
+            }), 500
+
         cleaned_text = clean_text(extracted_text).upper()
         
         app.logger.info(f"Extracted text: {cleaned_text}")
