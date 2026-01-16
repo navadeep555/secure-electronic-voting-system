@@ -96,25 +96,28 @@ export default function Register() {
 
     const startCamera = async () => {
         try {
-            const mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'user', width: 640, height: 480 }
-            })
-
-            if (videoRef.current) {
-                videoRef.current.srcObject = mediaStream
-            }
-
-            setStream(mediaStream)
             setCameraError('')
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 640, height: 480 }
+            })
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream
+                setStream(stream)
 
-            // Load face-api.js models
-            await loadFaceApiModels()
+                await loadFaceApiModels()
+                startPoseDetection()
+            }
+        } catch (error: any) {
+            console.error("Camera Error:", error)
 
-            // Start pose detection
-            startPoseDetection()
-        } catch (error) {
-            console.error('Camera access error:', error)
-            setCameraError('Unable to access camera. Please grant permission.')
+            if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                setCameraError('Camera access was denied. Please enable camera permissions in your browser settings.')
+            } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                setCameraError('No camera device found. Please connect a camera.')
+            } else {
+                setCameraError('Could not start camera. Please check your connection and try again.')
+            }
+            setDetectionMessage('Camera initialization failed')
         }
     }
 
@@ -417,7 +420,19 @@ export default function Register() {
                                 ))}
                             </div>
 
-                            {cameraError && <p className="error text-red-500 mt-2">{cameraError}</p>}
+                            {cameraError && (
+                                <div className="error-container mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-center">
+                                    <p className="text-red-600 mb-2 font-medium">{cameraError}</p>
+                                    <a
+                                        href="https://support.google.com/chrome/answer/2693767"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 underline text-sm hover:text-blue-800 flex items-center justify-center gap-1"
+                                    >
+                                        How to enable camera access
+                                    </a>
+                                </div>
+                            )}
 
                             {!stream && (
                                 <div className="button-group mt-4">
