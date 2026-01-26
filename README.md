@@ -27,8 +27,8 @@ SecureVote Identity is a secure, biometric-enabled identity verification system 
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/AURA-stack-svg/secure_vote.git
-    cd secure_vote
+    git clone https://github.com/navadeep555/secure-electronic-voting-system.git
+    cd secure-electronic-voting-system
     ```
 
 2.  **Frontend Setup:**
@@ -65,25 +65,3 @@ SecureVote Identity is a secure, biometric-enabled identity verification system 
 3.  Upload your Aadhaar and Voter ID documents.
 4.  Complete the 4-stage biometric face capture process by following the on-screen instructions.
 5.  Submit your registration!
-
-## Error Monitoring & Troubleshooting
-
-### Error Monitoring
-The application logs errors to `backend/logs/app.log`. 
-To monitor errors in real-time:
-```bash
-tail -f backend/logs/app.log
-```
-
-### Common Issues
-1. **Camera Permission Denied**:
-   - Ensure browser permissions are allowed.
-   - Check if another application is using the camera.
-
-2. **Backend Connection Failed**:
-   - Verify backend is running on port 5001.
-   - Check CORS settings in `app.py`.
-
-3. **OCR Failed**:
-   - Ensure image is clear and well-lit.
-   - Verify specific document format (Aadhaar/Voter ID).
