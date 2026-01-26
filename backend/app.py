@@ -1,55 +1,26 @@
 import os
-import pickle
-import face_recognition
-import easyocr
-import cv2
-import numpy as np
+import json
 import base64
-from io import BytesIO
-from PIL import Image
-from queue import Queue
-from flask import Flask, jsonify, request
+import numpy as np
+import face_recognition
+from flask import Flask, request, jsonify
 from flask_cors import CORS
-import logging
-from logging.handlers import RotatingFileHandler
+from PIL import Image
+from io import BytesIO
+from datetime import datetime
+import pickle
 
 app = Flask(__name__)
 CORS(app)
 
-# Create directories for storing face data and logs
+# Create directories for storing face data
 os.makedirs("face_data", exist_ok=True)
 os.makedirs("encodings", exist_ok=True)
-os.makedirs("logs", exist_ok=True)
-
-# Configure logging with rotation
-handler = RotatingFileHandler('logs/app.log', maxBytes=10000000, backupCount=3)
-handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-app.logger.addHandler(handler)
-app.logger.setLevel(logging.INFO)
-app.logger.info('Application started')
 
 class FaceRecognitionSystem:
-    """
-    Face Recognition System for Voter Authentication
-    
-    This class handles all face recognition operations including:
-    - Loading and saving face encodings
-    - Image preprocessing and conversion
-    - Face encoding extraction
-    - Face recognition and matching
-    
-    Attributes:
-        known_encodings (dict): Dictionary mapping user IDs to their face encodings
-        known_names (list): List of registered user IDs
-    """
-    
     def __init__(self):
-        """Initialize the face recognition system and load existing encodings"""
-        self.known_encodings = {}
+        self.known_encodings = {}  # {user_id: [encoding1, encoding2, encoding3, encoding4]}
         self.known_names = []
-        self.frame_queue = Queue(maxsize=10) # Image processing queue
         self.load_encodings()
     
     def load_encodings(self):
@@ -71,20 +42,13 @@ class FaceRecognitionSystem:
         print("💾 Face encodings saved")
     
     def base64_to_image(self, base64_string):
-        """
-        Convert base64 encoded string to numpy image array
-        
-        Args:
-            base64_string (str): Base64 encoded image string (with or without data URI prefix)
-            
-        Returns:
-            numpy.ndarray: Image array in RGB format, or None if conversion fails
-        """
-        
+        """Convert base64 string to PIL Image"""
         try:
-            if ',' in base64_string:
-                base64_string = base64_string.split(',')[1]
+            # Remove data URI prefix if present
+            if "," in base64_string:
+                base64_string = base64_string.split(",")[1]
             
+            # Decode base64
             img_data = base64.b64decode(base64_string)
             img = Image.open(BytesIO(img_data))
             return np.array(img)
@@ -93,55 +57,84 @@ class FaceRecognitionSystem:
             return None
     
     def get_face_encoding(self, image_array):
-        """
-        Extract face encoding from image array (Encoding Operation)
-        
-        This method handles the encoding phase - extracting facial features
-        into a numerical representation that can be compared.
-        
-        Args:
-            image_array (numpy.ndarray): Image array in RGB format
-            
-        Returns:
-            numpy.ndarray: 128-dimensional face encoding, or None if no face found
-        """
+        """Extract face encoding from image array"""
         try:
+            # Find faces in the image
             face_locations = face_recognition.face_locations(image_array, model="hog")
             
             if not face_locations:
                 print("⚠️ No face found in image")
-                return None
+                return None, None
             
+            # Get encoding for the first (and hopefully only) face
             face_encodings = face_recognition.face_encodings(image_array, face_locations)
             
             if not face_encodings:
                 print("⚠️ Could not encode face")
-                return None
+                return None, None
             
-            return face_encodings[0]
+            return face_encodings[0], face_locations[0]
         except Exception as e:
             print(f"❌ Error encoding face: {e}")
-            return None
+            return None, None
+    
+    def register_user(self, user_id, face_images):
+        """
+        Register a user with their 4 biometric face images
+        face_images: list of 4 base64 image strings [front, left, right, up]
+        """
+        try:
+            encodings = []
+            valid_faces = 0
+            
+            for idx, base64_img in enumerate(face_images):
+                print(f"🔍 Processing stage {idx + 1} face...")
+                
+                # Convert base64 to image
+                img_array = self.base64_to_image(base64_img)
+                if img_array is None:
+                    print(f"⚠️ Could not process stage {idx + 1}")
+                    continue
+                
+                # Extract face encoding
+                encoding, location = self.get_face_encoding(img_array)
+                if encoding is None:
+                    print(f"⚠️ No valid face in stage {idx + 1}")
+                    continue
+                
+                encodings.append(encoding)
+                valid_faces += 1
+                print(f"✅ Stage {idx + 1} face encoded successfully")
+            
+            if valid_faces < 2:
+                return {
+                    "success": False,
+                    "message": f"Need at least 2 valid face images. Got {valid_faces}"
+                }
+            
+            # Store encodings for this user
+            self.known_encodings[user_id] = encodings
+            self.known_names.append(user_id)
+            self.save_encodings()
+            
+            return {
+                "success": True,
+                "message": f"✅ User registered successfully with {valid_faces} valid face images",
+                "valid_faces": valid_faces,
+                "total_stages": len(face_images)
+            }
+        
+        except Exception as e:
+            print(f"❌ Registration error: {e}")
+            return {
+                "success": False,
+                "message": f"Registration failed: {str(e)}"
+            }
     
     def recognize_face(self, base64_image, tolerance=0.6):
         """
-        Recognize a face from a single image (Recognition Operation)
-        
-        This method handles the recognition phase - comparing a test face
-        against all known encodings to find a match.
-        
-        Args:
-            base64_image (str): Base64 encoded image containing a face
-            tolerance (float): Distance threshold for matching (default: 0.6)
-                              Lower values = stricter matching
-                              
-        Returns:
-            dict: Recognition result containing:
-                - success (bool): Whether a match was found
-                - message (str): Human-readable result message
-                - matched_user (str|None): User ID if matched
-                - distance (float): Best match distance
-                - tolerance (float): Threshold used
+        Recognize a face from a single image
+        tolerance: lower = stricter matching (0.6 is default, 0.5 is stricter)
         """
         try:
             print("🔍 Attempting face recognition...")
@@ -152,7 +145,7 @@ class FaceRecognitionSystem:
                 return {"success": False, "message": "Could not process image"}
             
             # Get face encoding from the test image
-            test_encoding = self.get_face_encoding(img_array)
+            test_encoding, _ = self.get_face_encoding(img_array)
             if test_encoding is None:
                 return {"success": False, "message": "No face detected in image"}
             
@@ -163,35 +156,43 @@ class FaceRecognitionSystem:
                     "message": "No registered users in database"
                 }
             
-            # Compare against all known encodings using face_recognition.compare_faces()
+            # Compare against all known encodings
             best_match_name = None
             best_match_distance = float('inf')
+            match_details = {}
             
             for user_id, user_encodings in self.known_encodings.items():
-                # Calculate face distance
+                # Compare test encoding against all this user's encodings
                 distances = face_recognition.face_distance(user_encodings, test_encoding)
                 min_distance = np.min(distances)
+                
+                match_details[user_id] = {
+                    "min_distance": float(min_distance),
+                    "avg_distance": float(np.mean(distances)),
+                    "stages_matched": int(np.sum(distances < tolerance))
+                }
                 
                 # Track best match
                 if min_distance < best_match_distance:
                     best_match_distance = min_distance
                     best_match_name = user_id
             
-            # Determine if it's a match based on distance threshold (0.6)
+            # Determine if it's a match
             is_match = best_match_distance < tolerance
             
             result = {
                 "success": is_match,
-                "message": f"{'✅ Face matched!' if is_match else '❌ Face not recognized'}",
+                "message": f"{'✅ Face matched!' if is_match else '❌ Face not recognized'} Distance: {best_match_distance:.4f}",
                 "matched_user": best_match_name if is_match else None,
                 "distance": float(best_match_distance),
-                "tolerance": tolerance
+                "tolerance": tolerance,
+                "all_matches": match_details
             }
             
             if is_match:
                 print(f"✅ Recognized user: {best_match_name}")
             else:
-                print(f"❌ Could not recognize face. Distance: {best_match_distance:.4f}")
+                print(f"❌ Could not recognize face. Closest match: {best_match_name} (distance: {best_match_distance:.4f})")
             
             return result
         
@@ -205,163 +206,41 @@ class FaceRecognitionSystem:
 # Initialize recognition system
 face_system = FaceRecognitionSystem()
 
-# Initialize EasyOCR reader
-print("🔄 Initializing EasyOCR reader...")
-reader = easyocr.Reader(['en'], gpu=False)
-print("✅ EasyOCR reader initialized")
+# ============ API ENDPOINTS ============
 
-def preprocess_image(image_data):
-    """Preprocess image for better OCR results"""
-    # Convert base64 to numpy array
-    import base64
-    from io import BytesIO
-    from PIL import Image
-    
-    if ',' in image_data:
-        image_data = image_data.split(',')[1]
-    
-    img_bytes = base64.b64decode(image_data)
-    img = Image.open(BytesIO(img_bytes))
-    img_array = np.array(img)
-    
-    # Convert to grayscale
-    gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
-    
-    # Apply thresholding
-    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    
-    return thresh
-
-# Security Utils
-def sanitize_input(text):
-    """Sanitize input to prevent XSS and Injection"""
-    if not isinstance(text, str):
-        return text
-    # Remove potentially dangerous characters
-    import html
-    return html.escape(text)
-
-def clean_text(text):
-    """Remove special characters and clean text for better matching"""
-    import re
-    # Remove special characters but keep spaces and alphanumeric
-    cleaned = re.sub(r'[^a-zA-Z0-9\s/\-.]', '', text)
-    return cleaned.strip()
-
-from functools import wraps
-
-def validate_request(required_fields):
-    """Decorator to validate JSON request fields"""
-    def decorator(f):
-        @wraps(f)
-        def wrapper(*args, **kwargs):
-            if not request.is_json:
-                return jsonify({"success": False, "message": "Content-Type must be application/json"}), 400
-            
-            data = request.get_json()
-            missing = [field for field in required_fields if field not in data]
-            
-            if missing:
-                return jsonify({
-                    "success": False, 
-                    "message": f"Missing required fields: {', '.join(missing)}"
-                }), 400
-                
-            return f(*args, **kwargs)
-        return wrapper
-    return decorator
-
-@app.route('/api/verify_document', methods=['POST'])
-@validate_request(['image'])
-def verify_document():
-    """Document verification with regex patterns for DOB and keyword validation"""
-    import re
+@app.route("/api/register-face", methods=["POST"])
+def register_face():
+    """Register a new user with 4 biometric faces"""
     try:
-        data = request.get_json()
-        image_data = data.get('image')
+        data = request.json
+        user_id = data.get("userId")
+        face_images = data.get("faceImages", [])  # List of 4 base64 images
         
-        if not image_data:
-            return jsonify({
-                "success": False, 
-                "error": "No image provided",
-                "code": "MISSING_IMAGE"
-            }), 400
+        if not user_id:
+            return jsonify({"success": False, "message": "Missing userId"}), 400
         
-        # Preprocess image
-        try:
-            processed_img = preprocess_image(image_data)
-        except Exception as e:
-            app.logger.error(f"Image preprocessing failed: {e}")
+        if len(face_images) != 4:
             return jsonify({
                 "success": False,
-                "error": "Invalid image format",
-                "code": "INVALID_IMAGE"
+                "message": f"Expected 4 face images, got {len(face_images)}"
             }), 400
         
-        # Extract text using OCR
-        try:
-            results = reader.readtext(processed_img)
-            if not results:
-                raise Exception("No text detected")
-            extracted_text = ' '.join([text[1] for text in results])
-        except Exception as e:
-            app.logger.error(f"OCR Extraction failed: {e}")
-            return jsonify({
-                "success": False,
-                "error": "Failed to read text from document",
-                "code": "OCR_FAILED"
-            }), 500
-
-        cleaned_text = clean_text(extracted_text).upper()
-        
-        app.logger.info(f"Extracted text: {cleaned_text}")
-        
-        # Keyword validation for "ELECTION COMMISSION"
-        keywords = ["ELECTION", "COMMISSION"]
-        keyword_found = all(keyword in cleaned_text for keyword in keywords)
-        
-        if not keyword_found:
-            return jsonify({
-                "success": False,
-                "error": "Document does not appear to be a valid Voter ID",
-                "text": extracted_text
-            }), 400
-        
-        # Regex patterns for DOB (DD/MM/YYYY, DD-MM-YYYY)
-        dob_patterns = [
-            r'\b(\d{2})[/-](\d{2})[/-](\d{4})\b',  # DD/MM/YYYY or DD-MM-YYYY
-            r'\b(\d{2})\.(\d{2})\.(\d{4})\b',       # DD.MM.YYYY
-        ]
-        
-        dob_found = None
-        for pattern in dob_patterns:
-            match = re.search(pattern, extracted_text)
-            if match:
-                dob_found = match.group(0)
-                break
-        
-        return jsonify({
-            "success": True,
-            "text": extracted_text,
-            "cleaned_text": cleaned_text,
-            "dob": dob_found,
-            "keywords_validated": keyword_found,
-            "message": "Document verified successfully"
-        })
+        result = face_system.register_user(user_id, face_images)
+        return jsonify(result)
     
     except Exception as e:
-        app.logger.error(f"Document verification error: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({
+            "success": False,
+            "message": f"Server error: {str(e)}"
+        }), 500
 
-
-@app.route('/api/recognize_face', methods=['POST'])
-@validate_request(['faceImage'])
+@app.route("/api/recognize-face", methods=["POST"])
 def recognize_face():
     """Recognize a user from a single face image"""
     try:
-        data = request.get_json()
-        base64_image = data.get('faceImage')
-        tolerance = data.get('tolerance', 0.6)
+        data = request.json
+        base64_image = data.get("faceImage")
+        tolerance = data.get("tolerance", 0.6)
         
         if not base64_image:
             return jsonify({"success": False, "message": "Missing faceImage"}), 400
@@ -370,61 +249,166 @@ def recognize_face():
         return jsonify(result)
     
     except Exception as e:
-        app.logger.error(f"Face recognition error: {str(e)}")
         return jsonify({
             "success": False,
             "message": f"Server error: {str(e)}"
         }), 500
 
-
-@app.route('/api/users/<user_id>', methods=['GET'])
-def get_user_profile(user_id):
-    """Get user profile details"""
+@app.route("/api/verify-document", methods=["POST"])
+def verify_document():
+    """Verify a Voter ID document and check name match"""
     try:
-        import json
-        if not os.path.exists('users.json'):
-            return jsonify({"success": False, "message": "User database not found"}), 404
-            
-        with open('users.json', 'r') as f:
-            data = json.load(f)
-            
-        user = next((u for u in data.get('users', []) if u['id'] == user_id), None)
+        data = request.json
+        base64_image = data.get("documentImage")
+        expected_name = data.get("name")
         
-        if not user:
-            return jsonify({"success": False, "message": "User not found"}), 404
+        expected_dob = data.get("dob")
+        
+        if not base64_image or not expected_name or not expected_dob:
+            return jsonify({"success": False, "message": "Missing image, name, or DOB"}), 400
+            
+        print(f"🔍 Verifying document for: {expected_name}, DOB: {expected_dob}")
+        
+        # Convert base64 to image
+        img_array = face_system.base64_to_image(base64_image)
+        if img_array is None:
+            return jsonify({"success": False, "message": "Invalid image format"}), 400
+            
+        # Run OCR
+        import easyocr
+        import re
+        from datetime import datetime
+        
+        reader = easyocr.Reader(['en']) 
+        result = reader.readtext(img_array)
+        
+        extracted_text = " ".join([text[1] for text in result]).upper()
+        print(f"📝 Extracted text: {extracted_text}")
+        
+        # 1. Check if it's a real Voter ID (Basic Keyword Check)
+        keywords = ["ELECTION", "COMMISSION", "INDIA", "ELECTOR", "IDENTITY", "CARD", "EPIC", "VOTER"]
+        keyword_matches = [k for k in keywords if k in extracted_text]
+        
+        is_valid_id = len(keyword_matches) >= 2 # At least 2 keywords must match
+        
+        # 2. Check Name Match
+        input_name = expected_name.upper().strip()
+        name_parts = input_name.split()
+        
+        name_match = False
+        if input_name in extracted_text:
+            name_match = True
+        else:
+            if len(name_parts) >= 2:
+                if name_parts[0] in extracted_text and name_parts[-1] in extracted_text:
+                    name_match = True
+
+        # 3. Check DOB Match
+        # expected_dob comes as YYYY-MM-DD from HTML date input
+        dob_match = False
+        try:
+            # Parse input DOB
+            dob_obj = datetime.strptime(expected_dob, "%Y-%m-%d")
+            
+            # Formats to look for in OCR text
+            # DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+            date_patterns = [
+                dob_obj.strftime("%d/%m/%Y"),
+                dob_obj.strftime("%d-%m-%Y"),
+                dob_obj.strftime("%d.%m.%Y"),
+                # Sometimes spaces instead of separators
+                dob_obj.strftime("%d %m %Y"),
+                # Year only check (fallback) if full date fails? Maybe too lenient. Let's stick to full date first.
+            ]
+            
+            print(f"📅 Looking for DOB patterns: {date_patterns}")
+            
+            # Simple substring search for these patterns
+            for pattern in date_patterns:
+                if pattern in extracted_text:
+                    dob_match = True
+                    break
+                    
+            # Regex search for the specific date if simple match fails (handles spacing issues)
+            if not dob_match:
+                # Construct regex: DD followed by separator followed by MM...
+                d, m, y = dob_obj.strftime("%d"), dob_obj.strftime("%m"), dob_obj.strftime("%Y")
+                # pattern: d \D? m \D? y (digits with optional non-digit separator)
+                regex_pattern = f"{d}[\\/\\-\\.\\s]+{m}[\\/\\-\\.\\s]+{y}"
+                if re.search(regex_pattern, extracted_text):
+                    dob_match = True
+
+        except Exception as e:
+            print(f"⚠️ Date parsing error: {e}")
+            # Don't fail the whole request on date parse error alone, but dob_match will be False
+
+        
+        if not is_valid_id:
+            return jsonify({
+                "success": False, 
+                "message": "Could not verify this as a valid Voter ID card. Please ensure the image is clear."
+            })
+            
+        if not name_match:
+            return jsonify({
+                "success": False, 
+                "message": f"Name mismatch. Expected '{expected_name}' but could not find it clearly on the document."
+            })
+
+        if not dob_match:
+             return jsonify({
+                "success": False, 
+                "message": f"Date of Birth mismatch. Expected '{expected_dob}' (or similar format) on the document."
+            })
             
         return jsonify({
             "success": True,
-            "user": user
+            "message": "✅ Document (Name & DOB) verified successfully!",
+            "extracted_text": extracted_text[:100] + "..." 
         })
+    
     except Exception as e:
-        app.logger.error(f"Error fetching user profile: {str(e)}")
-        return jsonify({"success": False, "message": "Server error"}), 500
+        print(f"❌ Verification error: {e}")
+        return jsonify({
+            "success": False,
+            "message": f"Verification error: {str(e)}"
+        }), 500
 
-@app.route('/api/elections', methods=['GET'])
-def get_elections():
-    """Get upcoming elections (Mock Data)"""
-    elections = [
-        {
-            "id": "E001",
-            "title": "General Election 2026",
-            "date": "2026-05-15",
-            "status": "upcoming",
-            "description": "National parliamentary elections"
-        },
-        {
-            "id": "E002",
-            "title": "State Assembly Election",
-            "date": "2026-03-10",
-            "status": "upcoming",
-            "description": "State legislative assembly elections"
-        }
-    ]
-    return jsonify({"success": True, "elections": elections})
+@app.route("/api/users", methods=["GET"])
+def get_users():
+    """Get list of registered users"""
+    try:
+        users = []
+        for user_id in face_system.known_names:
+            num_encodings = len(face_system.known_encodings.get(user_id, []))
+            users.append({
+                "userId": user_id,
+                "encodingsCount": num_encodings
+            })
+        
+        return jsonify({
+            "success": True,
+            "total_users": len(users),
+            "users": users
+        })
+    
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Error: {str(e)}"
+        }), 500
 
-@app.route('/api/health', methods=['GET'])
+@app.route("/api/health", methods=["GET"])
 def health():
-    return jsonify({"status": "Server is running"})
+    """Health check endpoint"""
+    return jsonify({
+        "status": "✅ Face Recognition + Document Verification Server is Running",
+        "registered_users": len(face_system.known_names),
+        "timestamp": datetime.now().isoformat()
+    })
 
-if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+if __name__ == "__main__":
+    print("🚀 Starting Face & Document Verification Server...")
+    print("📍 Server running on http://localhost:5001")
+    print("⚠️  Make sure to install dependencies: pip install -r requirements.txt")
+    app.run(debug=True, port=5001, host="0.0.0.0")
