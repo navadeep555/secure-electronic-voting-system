@@ -1,45 +1,37 @@
-import { motion, HTMLMotionProps } from 'framer-motion'
-import { ReactNode } from 'react'
-import { slideIn, fadeIn } from '../lib/animations'
+import { motion } from "framer-motion";
+import { ReactNode } from "react";
+import { containerVariants, itemVariants } from "@/lib/animations";
 
-interface AnimatedContainerProps extends HTMLMotionProps<"div"> {
-  children: ReactNode
-  delay?: number
-  slideDirection?: 'left' | 'right' | 'none'
-  className?: string
+interface AnimatedContainerProps {
+  children: ReactNode;
+  className?: string;
 }
 
-export function AnimatedContainer({ 
-  children, 
-  delay = 0, 
-  slideDirection = 'none',
-  className = "",
-  ...props 
-}: AnimatedContainerProps) {
-  
-  const getVariants = () => {
-    if (slideDirection === 'left') return slideIn
-    if (slideDirection === 'right') {
-      return {
-        ...slideIn,
-        initial: { x: 20, opacity: 0 },
-        exit: { x: -20, opacity: 0 }
-      }
-    }
-    return fadeIn
-  }
-
+export function AnimatedContainer({ children, className }: AnimatedContainerProps) {
   return (
     <motion.div
-      variants={getVariants()}
+      className={className}
       initial="initial"
       animate="animate"
-      exit="exit"
-      transition={{ delay }}
-      className={className}
-      {...props}
+      variants={containerVariants}
     >
       {children}
     </motion.div>
-  )
+  );
+}
+
+interface AnimatedItemProps {
+  children: ReactNode;
+  className?: string;
+}
+
+export function AnimatedItem({ children, className }: AnimatedItemProps) {
+  return (
+    <motion.div
+      className={className}
+      variants={itemVariants}
+    >
+      {children}
+    </motion.div>
+  );
 }

@@ -1,21 +1,20 @@
-import { motion, AnimatePresence } from 'framer-motion'
-import { ReactNode } from 'react'
+import { motion } from "framer-motion";
+import { ReactNode } from "react";
+import { pageVariants } from "@/lib/animations";
 
 interface PageWrapperProps {
-  children: ReactNode
+  children: ReactNode;
 }
 
 export function PageWrapper({ children }: PageWrapperProps) {
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
-        transition={{ duration: 0.5, ease: 'easeInOut' }}
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
-  )
+    <motion.div
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      variants={pageVariants}
+    >
+      {children}
+    </motion.div>
+  );
 }

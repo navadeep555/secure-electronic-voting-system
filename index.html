@@ -1,33 +1,27 @@
 <!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SecureVote</title>
+    <meta name="description" content="Secure and transparent voting platform" />
+    <meta name="author" content="SecureVote" />
 
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SecureVote</title>
-  <!-- Security Headers -->
-  <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data:; img-src 'self' data: blob: https:; connect-src 'self' http://localhost:5001 ws://localhost:*" />
-  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-  <meta name="description" content="Secure and transparent voting platform" />
-  <meta name="author" content="SecureVote" />
+    <meta property="og:title" content="SecureVote" />
+    <meta property="og:description" content="Secure and transparent voting platform" />
+    <meta property="og:type" content="website" />
 
-  <meta property="og:title" content="SecureVote" />
-  <meta property="og:description" content="Secure and transparent voting platform" />
-  <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@SecureVote" />
+    
+    <!-- Favicon - Shield + Vote symbol -->
+    <link rel="icon" type="image/svg+xml" href="/securevote-favicon.svg" />
+    <link rel="apple-touch-icon" href="/securevote-favicon.svg" />
+    <meta name="theme-color" content="#0066CC" />
+  </head>
 
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:site" content="@SecureVote" />
-
-  <!-- Favicon - Shield + Vote symbol -->
-  <link rel="icon" type="image/svg+xml" href="/securevote-favicon.svg" />
-  <link rel="apple-touch-icon" href="/securevote-favicon.svg" />
-  <meta name="theme-color" content="#0066CC" />
-</head>
-
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
-</body>
-
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
