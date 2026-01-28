@@ -1,179 +1,193 @@
-import * as faceapi from 'face-api.js'
+/**
+ * Face Recognition Service
+ * Handles communication with Python facial recognition backend
+ */
 
-// face-api.js model loading state
-let modelsLoaded = false
+const FACE_API_URL = "http://localhost:5001/api";
 
-// Load face-api.js models
-export async function loadFaceApiModels(): Promise<boolean> {
-    if (modelsLoaded) return true
-
-    try {
-        console.log('Loading face-api.js models...')
-
-        const MODEL_URL = '/models'
-
-        await Promise.all([
-            faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
-            faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-            faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        ])
-
-        modelsLoaded = true
-        console.log('✅ face-api.js models loaded successfully')
-        return true
-    } catch (error) {
-        console.error('❌ Failed to load face-api.js models:', error)
-        return false
-    }
+export interface FaceRecognitionResult {
+  success: boolean;
+  message: string;
+  matched_user?: string;
+  distance?: number;
+  tolerance?: number;
+  all_matches?: Record<string, { min_distance: number; avg_distance: number; stages_matched: number }>;
 }
 
-// Detect face landmarks on video stream
-export async function detectFaceLandmarks(
-    video: HTMLVideoElement
-): Promise<faceapi.WithFaceLandmarks<{ detection: faceapi.FaceDetection }> | null> {
-    try {
-        if (!modelsLoaded) {
-            await loadFaceApiModels()
-        }
-
-        const detection = await faceapi
-            .detectSingleFace(video, new faceapi.SsdMobilenetv1Options())
-            .withFaceLandmarks()
-
-        return detection || null
-    } catch (error) {
-        console.error('Face landmark detection error:', error)
-        return null
-    }
+export interface RegistrationResult {
+  success: boolean;
+  message: string;
+  valid_faces?: number;
+  total_stages?: number;
 }
 
-// Analyze head pose from landmarks
-export function analyzeHeadPose(landmarks: faceapi.FaceLandmarks68): {
-    direction: 'CENTER' | 'LEFT' | 'RIGHT' | 'UP' | 'DOWN'
-    confidence: number
-} {
-    const nose = landmarks.getNose()
-    const leftEye = landmarks.getLeftEye()
-    const rightEye = landmarks.getRightEye()
-    const mouth = landmarks.getMouth()
+/**
+ * Register a user with 4 biometric face images
+ */
+export async function registerUserFaces(
+  userId: string,
+  faceImages: string[] // 4 base64 images
+): Promise<RegistrationResult> {
+  try {
+    const response = await fetch(`${FACE_API_URL}/register-face`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        userId,
+        faceImages,
+      }),
+    });
 
-    // Calculate face center
-    const faceCenter = {
-        x: (leftEye[0].x + rightEye[3].x) / 2,
-        y: (leftEye[0].y + rightEye[3].y) / 2
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    // Calculate nose position relative to face center
-    const noseX = nose[3].x - faceCenter.x
-    const noseY = nose[3].y - faceCenter.y
+    const result: RegistrationResult = await response.json();
+    console.log("✅ Registration result:", result);
+    return result;
+  } catch (error) {
+    console.error("❌ Registration error:", error);
+    return {
+      success: false,
+      message: `Registration failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+    };
+  }
+}
 
-    // Determine direction based on nose position
-    const threshold = 15
+/**
+ * Recognize a user from a single face image
+ */
+export async function recognizeUserFace(
+  faceImage: string, // base64 image
+  tolerance: number = 0.6
+): Promise<FaceRecognitionResult> {
+  try {
+    const response = await fetch(`${FACE_API_URL}/recognize-face`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        faceImage,
+        tolerance,
+      }),
+    });
 
-    if (Math.abs(noseX) < threshold && Math.abs(noseY) < threshold) {
-        return { direction: 'CENTER', confidence: 0.9 }
-    } else if (noseX < -threshold) {
-        return { direction: 'LEFT', confidence: 0.8 }
-    } else if (noseX > threshold) {
-        return { direction: 'RIGHT', confidence: 0.8 }
-    } else if (noseY < -threshold) {
-        return { direction: 'UP', confidence: 0.8 }
-    } else {
-        return { direction: 'DOWN', confidence: 0.7 }
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const result: FaceRecognitionResult = await response.json();
+    console.log("🔍 Recognition result:", result);
+    return result;
+  } catch (error) {
+    console.error("❌ Recognition error:", error);
+    return {
+      success: false,
+      message: `Recognition failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+    };
+  }
 }
 
-// Basic TypeScript interfaces for face data
-export interface FaceData {
-    image: string
-    timestamp: number
-}
+/**
+ * Get list of all registered users
+ */
+export async function getRegisteredUsers() {
+  try {
+    const response = await fetch(`${FACE_API_URL}/users`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
 
-export interface CameraConfig {
-    width: number
-    height: number
-    facingMode: 'user' | 'environment'
-}
-
-// Start camera function
-export async function startCamera(videoElement: HTMLVideoElement): Promise<MediaStream> {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'user', width: 640, height: 480 }
-        })
-
-        videoElement.srcObject = stream
-        return stream
-    } catch (error) {
-        console.error('Failed to start camera:', error)
-        throw new Error('Camera access denied')
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const result = await response.json();
+    console.log("👥 Registered users:", result);
+    return result;
+  } catch (error) {
+    console.error("❌ Error fetching users:", error);
+    return {
+      success: false,
+      message: `Failed to fetch users: ${error instanceof Error ? error.message : "Unknown error"}`,
+    };
+  }
 }
 
-// Stop camera function
-export function stopCamera(stream: MediaStream | null) {
-    if (stream) {
-        stream.getTracks().forEach(track => track.stop())
+/**
+ * Check if face recognition server is running
+ */
+export async function checkFaceServerHealth() {
+  try {
+    const response = await fetch(`${FACE_API_URL}/health`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const result = await response.json();
+    console.log("✅ Server health:", result);
+    return result;
+  } catch (error) {
+    console.error("❌ Server health check failed:", error);
+    return {
+      status: "❌ Face Recognition Server is not running",
+      registered_users: 0,
+    };
+  }
 }
 
-// Verify document function
+/**
+ * Verify a Voter ID document
+ */
 export async function verifyDocument(
-    imageBase64: string,
-    onLoading?: (loading: boolean) => void,
-    onSuccess?: (message: string) => void,
-    onError?: (error: string) => void
-): Promise<{
-    success: boolean
-    text?: string
-    cleaned_text?: string
-    dob?: string
-    keywords_validated?: boolean
-    message?: string
-    error?: string
-}> {
-    try {
-        // Set loading state
-        if (onLoading) onLoading(true)
+  documentImage: string, // base64 image
+  name: string,
+  dob: string
+): Promise<{ success: boolean; message: string; extracted_text?: string }> {
+  try {
+    const response = await fetch(`${FACE_API_URL}/verify-document`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        documentImage,
+        name,
+        dob,
+      }),
+    });
 
-        const response = await fetch('http://localhost:5001/api/verify_document', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ image: imageBase64 })
-        })
-
-        const data = await response.json()
-
-        // Clear loading state
-        if (onLoading) onLoading(false)
-
-        if (!response.ok) {
-            const errorMsg = data.error || 'Document verification failed'
-            if (onError) onError(errorMsg)
-            throw new Error(errorMsg)
-        }
-
-        // Success message handling
-        if (onSuccess && data.message) {
-            onSuccess(data.message)
-        }
-
-        return data
-    } catch (error) {
-        // Clear loading state
-        if (onLoading) onLoading(false)
-
-        console.error('Document verification error:', error)
-        const errorMsg = error instanceof Error ? error.message : 'Failed to verify document'
-
-        // Error message handling
-        if (onError) onError(errorMsg)
-
-        return {
-            success: false,
-            error: errorMsg
-        }
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const result = await response.json();
+    console.log("📝 Verification result:", result);
+    return result;
+  } catch (error) {
+    console.error("❌ Verification error:", error);
+    return {
+      success: false,
+      message: `Verification failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+    };
+  }
 }
+
+export default {
+  registerUserFaces,
+  recognizeUserFace,
+  getRegisteredUsers,
+  checkFaceServerHealth,
+  verifyDocument,
+};
