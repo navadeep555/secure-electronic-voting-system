@@ -1,222 +1,99 @@
-import { motion, useMotionValue, useTransform, useSpring } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useRef, useState, ReactNode } from 'react';
-import { colors, animationDurations } from '@/lib/designTokens';
+
+// ═══════════════════════════════════════════════════════════════
+// OFFICIAL COMPONENT LIBRARY REPLACEMENT
+// ═══════════════════════════════════════════════════════════════
+// Note: We retain original component names (GlassmorphCard, MagneticButton)
+// to prevent breaking existing imports, but the IMPLEMENTATION is now
+// "Standard/Civic" style (no physics, no neon, solid clean UI).
+// ═══════════════════════════════════════════════════════════════
 
 /**
- * 3D Tilt Card with Mouse Tracking
- * Follows cursor and tilts in 3D space
+ * Standard Card (Was TiltCard)
+ * Now a solid official card with subtle shadow. No 3D tilt.
  */
 interface TiltCardProps {
   children: ReactNode;
   className?: string;
-  intensity?: number;
-  scale?: number;
-  hoverGlow?: boolean;
+  intensity?: number; // Ignored in official theme
+  scale?: number;     // Ignored
+  hoverGlow?: boolean; // Ignored
 }
 
 export function TiltCard({
   children,
   className = '',
-  intensity = 0.5,
-  scale = 1.02,
-  hoverGlow = true,
 }: TiltCardProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [isHovering, setIsHovering] = useState(false);
-
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-
-  // Calculate rotation angles based on mouse position
-  const rotateX = useTransform(mouseY, [-100, 100], [intensity * 10, -intensity * 10]);
-  const rotateY = useTransform(mouseX, [-100, 100], [-intensity * 10, intensity * 10]);
-
-  // Spring animation for smooth following
-  const springConfig = { damping: 20, stiffness: 150 };
-  const rotateXSpring = useSpring(rotateX, springConfig);
-  const rotateYSpring = useSpring(rotateY, springConfig);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!ref.current) return;
-
-    const rect = ref.current.getBoundingClientRect();
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-
-    const x = e.clientX - rect.left - centerX;
-    const y = e.clientY - rect.top - centerY;
-
-    mouseX.set(x);
-    mouseY.set(y);
-  };
-
-  const handleMouseLeave = () => {
-    mouseX.set(0);
-    mouseY.set(0);
-    setIsHovering(false);
-  };
-
-  return (
-    <motion.div
-      ref={ref}
-      className={`relative ${className}`}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      onMouseEnter={() => setIsHovering(true)}
-      animate={{
-        scale: isHovering ? scale : 1,
-      }}
-      transition={{ duration: animationDurations.base }}
-      style={{
-        rotateX: rotateXSpring,
-        rotateY: rotateYSpring,
-        transformStyle: 'preserve-3d',
-      }}
-    >
-      {/* Glow effect on hover */}
-      {hoverGlow && (
-        <motion.div
-          className="absolute inset-0 rounded-2xl pointer-events-none"
-          animate={{
-            boxShadow: isHovering
-              ? `0 0 40px ${colors.glow.blue}, inset 0 1px 0 rgba(255, 255, 255, 0.1)`
-              : 'none',
-          }}
-          transition={{ duration: animationDurations.slow }}
-        />
-      )}
-
-      {children}
-    </motion.div>
-  );
-}
-
-/**
- * Magnetic Button - Cursor pulls the button toward mouse
- */
-interface MagneticButtonProps {
-  children: ReactNode;
-  onClick?: () => void;
-  className?: string;
-  intensity?: number;
-}
-
-export function MagneticButton({
-  children,
-  onClick,
-  className = '',
-  intensity = 0.3,
-}: MagneticButtonProps) {
-  const ref = useRef<HTMLButtonElement>(null);
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-
-  const springConfig = { damping: 20, stiffness: 300 };
-  const xSpring = useSpring(x, springConfig);
-  const ySpring = useSpring(y, springConfig);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!ref.current) return;
-
-    const rect = ref.current.getBoundingClientRect();
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-
-    const distX = e.clientX - rect.left - centerX;
-    const distY = e.clientY - rect.top - centerY;
-
-    const distance = Math.sqrt(distX * distX + distY * distY);
-    const radius = 100;
-
-    if (distance < radius) {
-      x.set(distX * intensity);
-      y.set(distY * intensity);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    x.set(0);
-    y.set(0);
-  };
-
-  return (
-    <motion.button
-      ref={ref}
-      className={className}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      onClick={onClick}
-      style={{
-        x: xSpring,
-        y: ySpring,
-      }}
-      whileTap={{ scale: 0.95 }}
-    >
-      {children}
-    </motion.button>
-  );
-}
-
-/**
- * Hover Glow Effect - Background responds to cursor
- */
-interface HoverGlowProps {
-  children: ReactNode;
-  className?: string;
-  glowColor?: string;
-}
-
-export function HoverGlow({
-  children,
-  className = '',
-  glowColor = colors.glow.blue,
-}: HoverGlowProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [isHovering, setIsHovering] = useState(false);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!ref.current) return;
-
-    const rect = ref.current.getBoundingClientRect();
-    setPosition({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    });
-  };
-
   return (
     <div
-      ref={ref}
-      className={className}
-      onMouseMove={handleMouseMove}
-      onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}
+      className={`relative bg-neutral-50 rounded-md border border-neutral-200 shadow-card hover:shadow-card-hover transition-shadow duration-300 ${className}`}
     >
-      {/* Glow orb that follows cursor */}
-      <motion.div
-        className="absolute pointer-events-none rounded-full"
-        style={{
-          width: '200px',
-          height: '200px',
-          left: position.x - 100,
-          top: position.y - 100,
-          background: glowColor,
-          filter: 'blur(40px)',
-        }}
-        animate={{
-          opacity: isHovering ? 0.3 : 0,
-        }}
-        transition={{ duration: animationDurations.slow }}
-      />
-
       {children}
     </div>
   );
 }
 
 /**
- * Floating Label Input - Label animates up on focus
+ * Standard Button (Was MagneticButton)
+ * Now a solid rect button. No magnetic physics.
+ */
+interface MagneticButtonProps {
+  children: ReactNode;
+  onClick?: () => void;
+  className?: string;
+  intensity?: number; // Ignored
+}
+
+export function MagneticButton({
+  children,
+  onClick,
+  className = '',
+}: MagneticButtonProps) {
+  // Map old gradient classes to new official colors if present in className
+  const cleanClassName = className
+    .replace('bg-gradient-to-r', '')
+    .replace('from-primary-500', '')
+    .replace('to-accent-500', 'bg-primary-700 hover:bg-primary-800') // Solid Burgundy
+    .replace('from-blue-500', '')
+    .replace('to-blue-600', 'bg-primary-700 hover:bg-primary-800')
+    .replace('text-white', '') // Will be re-added
+    .replace('rounded-xl', 'rounded-md'); // Sharper corners
+
+  return (
+    <button
+      className={`px-6 py-3 font-bold uppercase tracking-wider text-sm transition-all duration-200 text-white shadow-sm flex items-center justify-center gap-2 ${cleanClassName} ${!className.includes('bg-') ? 'bg-primary-700 hover:bg-primary-800' : ''}`}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Hover Container (Was HoverGlow)
+ * Just a simple container now. No glow orb.
+ */
+interface HoverGlowProps {
+  children: ReactNode;
+  className?: string;
+  glowColor?: string; // Ignored
+}
+
+export function HoverGlow({
+  children,
+  className = '',
+}: HoverGlowProps) {
+  return (
+    <div className={`relative ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Standard Input (Was FloatingLabelInput)
+ * Standard top-label input for clarity.
  */
 interface FloatingLabelInputProps {
   label: string;
@@ -235,45 +112,25 @@ export function FloatingLabelInput({
   placeholder = '',
   className = '',
 }: FloatingLabelInputProps) {
-  const [isFocused, setIsFocused] = useState(false);
-  const isFloating = isFocused || value.length > 0;
-
   return (
-    <div className={`relative ${className}`}>
-      <motion.label
-        initial={false}
-        animate={{
-          y: isFloating ? -24 : 0,
-          scale: isFloating ? 0.85 : 1,
-          opacity: isFloating ? 0.7 : 1,
-        }}
-        transition={{ duration: animationDurations.fast }}
-        className="absolute left-4 top-4 text-foreground-tertiary"
-      >
+    <div className={`flex flex-col gap-1.5 ${className}`}>
+      <label className="text-sm font-bold text-neutral-700 uppercase tracking-wide">
         {label}
-      </motion.label>
-
-      <motion.input
+      </label>
+      <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
         placeholder={placeholder}
-        animate={{
-          boxShadow: isFocused
-            ? `0 0 20px ${colors.glow.blue}, inset 0 1px 0 rgba(255, 255, 255, 0.1)`
-            : 'none',
-        }}
-        transition={{ duration: animationDurations.fast }}
-        className="w-full px-4 py-3 pt-6 bg-neutral-900 border border-neutral-700 rounded-lg text-foreground placeholder-foreground-tertiary"
+        className="w-full px-4 py-3 bg-white border border-neutral-300 text-neutral-900 rounded-sm focus:border-primary-700 focus:ring-1 focus:ring-primary-700 focus:outline-none transition-all shadow-inner placeholder:text-neutral-400"
       />
     </div>
   );
 }
 
 /**
- * Animated Progress Steps - Steps animate with momentum
+ * Standard Progress (Was AnimatedProgress)
+ * Clean, standard progress bar.
  */
 interface AnimatedProgressProps {
   currentStep: number;
@@ -287,85 +144,51 @@ export function AnimatedProgress({
   className = '',
 }: AnimatedProgressProps) {
   return (
-    <div className={`flex gap-2 ${className}`}>
+    <div className={`flex gap-3 ${className}`}>
       {Array.from({ length: totalSteps }).map((_, index) => (
-        <motion.div
+        <div
           key={index}
-          className="h-1 flex-1 bg-neutral-700 rounded-full overflow-hidden"
-          initial={{ scale: 0.8, opacity: 0.5 }}
-          animate={{
-            scale: index < currentStep ? 1 : 0.8,
-            opacity: index < currentStep ? 1 : 0.5,
-          }}
-          transition={{
-            duration: animationDurations.slow,
-            type: 'spring',
-            stiffness: 200,
-            damping: 20,
-          }}
+          className={`h-2 flex-1 rounded-full border border-neutral-200 overflow-hidden ${index < currentStep ? 'bg-neutral-200' : 'bg-neutral-100'
+            }`}
         >
-          <motion.div
-            className="h-full bg-gradient-to-r from-blue-500 to-purple-500"
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: index < currentStep ? 1 : 0 }}
-            transition={{
-              duration: animationDurations.slow,
-              delay: index * 0.1,
-            }}
-            style={{ originX: 0 }}
+          <div
+            className={`h-full transition-all duration-300 ease-out ${index < currentStep ? 'bg-primary-700' : 'w-0'
+              }`}
           />
-        </motion.div>
+        </div>
       ))}
     </div>
   );
 }
 
 /**
- * Glassmorphism Card with premium styling
+ * Official Card (Was GlassmorphCard)
+ * Solid white card, border, subtle shadow. No blurred glass.
  */
 interface GlassmorphCardProps {
   children: ReactNode;
   className?: string;
   hoverEffect?: boolean;
-  glow?: boolean;
+  glow?: boolean; // Ignored
 }
 
 export function GlassmorphCard({
   children,
   className = '',
   hoverEffect = true,
-  glow = true,
 }: GlassmorphCardProps) {
-  const [isHovering, setIsHovering] = useState(false);
-
   return (
-    <motion.div
-      className={`relative rounded-2xl border border-white/10 backdrop-blur-xl bg-white/5 overflow-hidden ${className}`}
-      onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}
-      animate={{
-        borderColor: isHovering && hoverEffect ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.1)',
-        boxShadow: isHovering && hoverEffect
-          ? `0 8px 32px rgba(91, 135, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1)`
-          : '0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-      }}
-      transition={{ duration: animationDurations.slow }}
+    <div
+      className={`relative bg-white rounded-lg border border-neutral-200 shadow-card ${hoverEffect ? 'hover:shadow-card-hover hover:border-neutral-300' : ''
+        } transition-all duration-300 ${className}`}
     >
-      {/* Gradient background on hover */}
-      {glow && (
-        <motion.div
-          className="absolute inset-0 opacity-0 pointer-events-none"
-          animate={{
-            opacity: isHovering ? 0.1 : 0,
-          }}
-          style={{
-            background: `linear-gradient(135deg, ${colors.glow.blue} 0%, transparent 100%)`,
-          }}
-        />
-      )}
+      {/* Top Accent Line for Official Feel */}
+      <div className="absolute top-0 left-0 w-full h-[3px] bg-primary-700 rounded-t-lg opacity-80" />
 
-      {children}
-    </motion.div>
+      <div className="p-1">
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -377,3 +200,5 @@ export default {
   AnimatedProgress,
   GlassmorphCard,
 };
+
+

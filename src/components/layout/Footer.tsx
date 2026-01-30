@@ -24,55 +24,55 @@ const footerLinks = {
 
 export function Footer() {
   return (
-    <footer className="bg-primary text-primary-foreground">
-      <div className="container py-12 md:py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12">
+    <footer className="bg-neutral-900 text-neutral-400 border-t border-primary-900 font-sans">
+      <div className="container py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
           {/* Brand Section */}
           <div className="lg:col-span-2">
-            <Link to="/" className="flex items-center gap-2.5 mb-4">
-              <div className="relative">
-                <Shield className="h-8 w-8 text-accent" />
-                <Vote className="h-4 w-4 text-primary-foreground absolute -bottom-0.5 -right-0.5" />
+            <Link to="/" className="flex items-center gap-3 mb-6">
+              <div className="relative flex items-center justify-center">
+                <Shield className="h-8 w-8 text-primary-600" fill="#4a0404" />
+                <Vote className="h-3 w-3 text-neutral-300 absolute" />
               </div>
               <div className="flex flex-col">
-                <span className="font-display text-lg font-semibold leading-tight">
+                <span className="font-display text-xl font-bold text-neutral-100 leading-none tracking-tight">
                   SecureVote
                 </span>
-                <span className="text-[10px] text-primary-foreground/70 uppercase tracking-widest">
+                <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-semibold mt-1">
                   Electoral Commission
                 </span>
               </div>
             </Link>
-            <p className="text-primary-foreground/70 text-sm max-w-xs mb-6">
-              A secure, anonymous, and transparent online voting platform ensuring fair and accessible elections for all citizens.
+            <p className="text-neutral-400 text-sm max-w-xs mb-8 leading-relaxed">
+              Official digital voting platform authorized by the National Electoral Commission. Ensuring secure, transparent, and verified elections for all eligible citizens.
             </p>
-            <div className="flex flex-col gap-2 text-sm text-primary-foreground/70">
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4" />
-                <span>1-800-VOTE-NOW</span>
+            <div className="flex flex-col gap-3 text-sm">
+              <div className="flex items-center gap-3 text-neutral-300">
+                <Phone className="h-4 w-4 text-accent-500" />
+                <span>1-800-VOTE-NOW (Official Helpline)</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                <span>support@securevote.gov</span>
+              <div className="flex items-center gap-3 text-neutral-300">
+                <Mail className="h-4 w-4 text-accent-500" />
+                <span>helpdesk@commission.gov</span>
               </div>
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                <span>Electoral Commission HQ</span>
+              <div className="flex items-center gap-3 text-neutral-300">
+                <MapPin className="h-4 w-4 text-accent-500" />
+                <span>Commission HQ, Capital City</span>
               </div>
             </div>
           </div>
 
           {/* Links Sections */}
           <div>
-            <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider">
-              Platform
+            <h3 className="font-bold text-neutral-100 mb-6 text-xs uppercase tracking-widest border-l-2 border-accent-600 pl-3">
+              Platform Info
             </h3>
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {footerLinks.platform.map((link) => (
                 <li key={link.name}>
                   <Link
                     to={link.href}
-                    className="text-sm text-primary-foreground/70 hover:text-primary-foreground transition-colors"
+                    className="text-sm hover:text-accent-400 transition-colors"
                   >
                     {link.name}
                   </Link>
@@ -82,15 +82,15 @@ export function Footer() {
           </div>
 
           <div>
-            <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider">
+            <h3 className="font-bold text-neutral-100 mb-6 text-xs uppercase tracking-widest border-l-2 border-accent-600 pl-3">
               Elections
             </h3>
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {footerLinks.elections.map((link) => (
                 <li key={link.name}>
                   <Link
                     to={link.href}
-                    className="text-sm text-primary-foreground/70 hover:text-primary-foreground transition-colors"
+                    className="text-sm hover:text-accent-400 transition-colors"
                   >
                     {link.name}
                   </Link>
@@ -100,15 +100,15 @@ export function Footer() {
           </div>
 
           <div>
-            <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider">
-              Legal
+            <h3 className="font-bold text-neutral-100 mb-6 text-xs uppercase tracking-widest border-l-2 border-accent-600 pl-3">
+              Legal & Compliance
             </h3>
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {footerLinks.legal.map((link) => (
                 <li key={link.name}>
                   <Link
                     to={link.href}
-                    className="text-sm text-primary-foreground/70 hover:text-primary-foreground transition-colors"
+                    className="text-sm hover:text-accent-400 transition-colors"
                   >
                     {link.name}
                   </Link>
@@ -119,17 +119,18 @@ export function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="mt-12 pt-8 border-t border-primary-foreground/10 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-primary-foreground/50">
-            © {new Date().getFullYear()} SecureVote Electoral Commission. All rights reserved.
+        <div className="mt-16 pt-8 border-t border-neutral-800 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-neutral-500">
+          <p>
+            © {new Date().getFullYear()} National Electoral Commission. All rights reserved. Authorized Government System.
           </p>
-          <div className="flex items-center gap-4">
-            <div className="security-indicator bg-success/20 text-success">
-              <Shield className="h-3 w-3" />
-              <span>256-bit Encryption</span>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <Shield className="h-3 w-3 text-emerald-500" />
+              <span className="text-neutral-400">Military-Grade Encryption</span>
             </div>
-            <div className="security-indicator bg-success/20 text-success">
-              <span>WCAG 2.1 AA</span>
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              <span className="text-neutral-400">System Operational</span>
             </div>
           </div>
         </div>

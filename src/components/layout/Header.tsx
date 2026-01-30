@@ -16,122 +16,104 @@ export function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
 
+
+
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <motion.header 
-      className="sticky top-0 z-50 w-full border-b border-border/50 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80"
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      transition={{ duration: 0.3 }}
+    <header
+      className="sticky top-0 z-50 w-full bg-white shadow-sm border-t-[4px] border-t-primary-700 font-sans"
     >
-      <div className="container flex h-16 items-center justify-between">
-        {/* Logo */}
-        <Link to="/" className="flex items-center gap-2.5 group">
-          <motion.div 
-            className="relative"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <Shield className="h-8 w-8 text-accent" />
-            <Vote className="h-4 w-4 text-primary absolute -bottom-0.5 -right-0.5" />
-          </motion.div>
+      <div className="container flex h-20 items-center justify-between">
+        {/* Logo - OFFICIAL & SERIOUS */}
+        <Link to="/" className="flex items-center gap-3 group">
+          <div className="relative flex items-center justify-center">
+            <Shield className="h-10 w-10 text-primary-700 fill-primary-50" strokeWidth={1.5} />
+            <Vote className="h-4 w-4 text-primary-900 absolute" />
+          </div>
           <div className="flex flex-col">
-            <span className="font-display text-lg font-semibold text-foreground leading-tight">
-              SecureVote
+            <span className="font-display text-xl font-bold text-neutral-900 leading-none tracking-tight">
+              SCV
             </span>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
-              Electoral Commission
+            <span className="text-[11px] text-neutral-600 uppercase tracking-widest font-semibold mt-1">
+              Secure Vote Commission
             </span>
           </div>
         </Link>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-1">
+        {/* Desktop Navigation - CLEAN & UNDERLINED */}
+        <nav className="hidden md:flex items-center gap-6">
           {navigation.map((item, index) => (
-            <motion.div
+            <Link
               key={item.name}
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-            >
-              <Link
-                to={item.href}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  isActive(item.href)
-                    ? "text-accent bg-accent/10"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+              to={item.href}
+              className={`relative px-1 py-1 text-sm font-bold uppercase tracking-wide transition-colors ${isActive(item.href)
+                ? "text-primary-700"
+                : "text-neutral-600 hover:text-primary-700"
                 }`}
-              >
-                {item.name}
-              </Link>
-            </motion.div>
+            >
+              {item.name}
+              {isActive(item.href) && (
+                <motion.div
+                  layoutId="activeNav"
+                  className="absolute bottom-[-4px] left-0 w-full h-[2px] bg-primary-700"
+                />
+              )}
+            </Link>
           ))}
         </nav>
 
-        {/* Desktop Auth Buttons */}
-        <motion.div 
-          className="hidden md:flex items-center gap-3"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-        >
+        {/* Desktop Auth Buttons - SQUARED & OFFICIAL */}
+        <div className="hidden md:flex items-center gap-4">
           <Link to="/login">
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <Button variant="ghost" size="sm">
-                Sign In
-              </Button>
-            </motion.div>
+            <Button variant="ghost" size="sm" className="font-semibold text-neutral-700 hover:bg-neutral-100 uppercase text-xs tracking-wider">
+              Voter Login
+            </Button>
           </Link>
           <Link to="/register">
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <Button variant="accent" size="sm">
-                Register to Vote
-              </Button>
-            </motion.div>
+            <Button className="bg-primary-700 hover:bg-primary-800 text-white font-bold uppercase text-xs tracking-wider px-6 rounded-sm shadow-sm transition-all">
+              Register
+            </Button>
           </Link>
-        </motion.div>
+        </div>
 
         {/* Mobile Menu */}
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetTrigger asChild className="md:hidden">
             <Button variant="ghost" size="icon">
-              <Menu className="h-5 w-5" />
+              <Menu className="h-6 w-6 text-neutral-700" />
               <span className="sr-only">Toggle menu</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-[300px] bg-card">
-            <div className="flex flex-col gap-6 mt-6">
-              <nav className="flex flex-col gap-2">
+          <SheetContent side="right" className="w-[300px] bg-white border-l-primary-700 border-l-4">
+            <div className="flex flex-col gap-8 mt-8">
+              <div className="flex items-center gap-2 pb-4 border-b border-neutral-200">
+                <Shield className="h-8 w-8 text-primary-700" />
+                <span className="font-display font-bold text-lg">Menu</span>
+              </div>
+              <nav className="flex flex-col gap-4">
                 {navigation.map((item) => (
                   <Link
                     key={item.name}
                     to={item.href}
                     onClick={() => setIsOpen(false)}
-                    className={`px-4 py-3 text-base font-medium rounded-lg transition-colors ${
-                      isActive(item.href)
-                        ? "text-accent bg-accent/10"
-                        : "text-foreground hover:bg-secondary"
-                    }`}
+                    className={`px-4 py-3 text-sm font-bold uppercase tracking-wide border-l-2 transition-all ${isActive(item.href)
+                      ? "text-primary-700 border-primary-700 bg-primary-50"
+                      : "text-neutral-600 border-transparent hover:bg-neutral-50"
+                      }`}
                   >
                     {item.name}
                   </Link>
                 ))}
               </nav>
-              <div className="flex flex-col gap-2 pt-4 border-t border-border">
+              <div className="flex flex-col gap-3 pt-4">
                 <Link to="/login" onClick={() => setIsOpen(false)}>
-                  <Button variant="outline" className="w-full">
-                    Sign In
+                  <Button variant="outline" className="w-full border-neutral-300 font-bold uppercase text-xs">
+                    Voter Login
                   </Button>
                 </Link>
                 <Link to="/register" onClick={() => setIsOpen(false)}>
-                  <Button variant="accent" className="w-full">
+                  <Button className="w-full bg-primary-700 text-white font-bold uppercase text-xs">
                     Register to Vote
                   </Button>
                 </Link>
@@ -140,6 +122,6 @@ export function Header() {
           </SheetContent>
         </Sheet>
       </div>
-    </motion.header>
+    </header>
   );
 }

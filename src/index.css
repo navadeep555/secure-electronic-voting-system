@@ -6,114 +6,78 @@
 
 @layer base {
   :root {
-    /* Government-grade professional palette */
-    --background: 210 25% 97%;
-    --foreground: 222 47% 11%;
+    /* OFFICIAL NATIONAL ELECTION THEME */
+
+    /* BACKGROUNDS: Clean, White, Document-like */
+    --background: 0 0% 100%;
+    /* Pure White */
+    --foreground: 220 13% 18%;
+    /* Dark Charcoal Text */
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 220 13% 18%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 220 13% 18%;
 
-    /* Deep navy - authoritative, trustworthy */
-    --primary: 222 47% 18%;
-    --primary-foreground: 210 40% 98%;
+    /* PRIMARY: Deep Burgundy - Authority & Trust */
+    --primary: 345 100% 25%;
+    /* #800020 - Burgundy */
+    --primary-foreground: 0 0% 100%;
 
-    /* Light slate for secondary surfaces */
-    --secondary: 210 20% 94%;
-    --secondary-foreground: 222 47% 18%;
+    /* SECONDARY: Light Gray - Structure */
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 220 13% 18%;
 
-    --muted: 210 20% 92%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 220 9% 46%;
 
-    /* Cyan accent - trust and security */
-    --accent: 192 82% 45%;
+    /* ACCENT: Gold/Brass - Prestige (Used sparingly) */
+    --accent: 43 45% 56%;
+    /* #C5A059 */
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Success green */
-    --success: 152 69% 40%;
-    --success-foreground: 0 0% 100%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 345 100% 25%;
+    /* Burgundy Ring focus */
 
-    /* Warning amber */
-    --warning: 38 92% 50%;
-    --warning-foreground: 222 47% 11%;
+    --radius: 0.25rem;
+    /* Sharper corners for official feel */
 
-    --border: 214 20% 88%;
-    --input: 214 20% 88%;
-    --ring: 192 82% 45%;
-
-    --radius: 0.5rem;
-
-    /* Custom gradients */
-    --gradient-hero: linear-gradient(135deg, hsl(222, 47%, 18%) 0%, hsl(222, 47%, 28%) 50%, hsl(192, 82%, 35%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0, 0%, 100%) 0%, hsl(210, 20%, 98%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(192, 82%, 45%) 0%, hsl(192, 82%, 55%) 100%);
-    
-    /* Shadows */
-    --shadow-sm: 0 1px 2px 0 hsl(222, 47%, 11%, 0.05);
-    --shadow-md: 0 4px 6px -1px hsl(222, 47%, 11%, 0.08), 0 2px 4px -2px hsl(222, 47%, 11%, 0.05);
-    --shadow-lg: 0 10px 15px -3px hsl(222, 47%, 11%, 0.1), 0 4px 6px -4px hsl(222, 47%, 11%, 0.05);
-    --shadow-xl: 0 20px 25px -5px hsl(222, 47%, 11%, 0.1), 0 8px 10px -6px hsl(222, 47%, 11%, 0.05);
-    --shadow-glow: 0 0 30px hsl(192, 82%, 45%, 0.3);
-
-    /* Sidebar */
-    --sidebar-background: 222 47% 18%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 192 82% 45%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222 47% 25%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 222 47% 25%;
-    --sidebar-ring: 192 82% 45%;
+    /* Shadows - Soft, non-colored */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   }
 
   .dark {
-    --background: 222 47% 8%;
-    --foreground: 210 40% 98%;
+    /* FORCE LIGHT THEME PREFERENCE EVEN IN DARK MODE FOR NOW
+       To ensure strict adherence to "White/Civic" requirement. 
+       If dark mode is needed, it should be Charcoal-based, not Blue-based. */
+    --background: 220 13% 18%;
+    /* Dark Charcoal */
+    --foreground: 0 0% 100%;
 
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
+    --card: 220 13% 22%;
+    --card-foreground: 0 0% 100%;
 
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
+    --primary: 345 80% 40%;
+    /* Lighter Burgundy */
+    --primary-foreground: 0 0% 100%;
 
-    --primary: 192 82% 45%;
-    --primary-foreground: 222 47% 11%;
+    --secondary: 220 13% 25%;
 
-    --secondary: 222 47% 15%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 222 47% 15%;
+    --muted: 220 13% 25%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 192 82% 45%;
-    --accent-foreground: 222 47% 11%;
+    --accent: 43 45% 56%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62% 30%;
-    --destructive-foreground: 210 40% 98%;
-
-    --success: 152 69% 40%;
-    --success-foreground: 0 0% 100%;
-
-    --warning: 38 92% 50%;
-    --warning-foreground: 222 47% 11%;
-
-    --border: 222 47% 20%;
-    --input: 222 47% 20%;
-    --ring: 192 82% 45%;
-
-    --sidebar-background: 222 47% 6%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 192 82% 45%;
-    --sidebar-primary-foreground: 222 47% 11%;
-    --sidebar-accent: 222 47% 12%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 222 47% 15%;
-    --sidebar-ring: 192 82% 45%;
+    --border: 220 13% 30%;
+    --input: 220 13% 30%;
   }
 }
 
@@ -126,7 +90,12 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-display;
   }
 }
@@ -208,34 +177,48 @@
   }
 
   @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
   }
 
   @keyframes slideUp {
-    from { 
-      opacity: 0; 
-      transform: translateY(20px); 
+    from {
+      opacity: 0;
+      transform: translateY(20px);
     }
-    to { 
-      opacity: 1; 
-      transform: translateY(0); 
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
   }
 
   @keyframes scaleIn {
-    from { 
-      opacity: 0; 
-      transform: scale(0.95); 
+    from {
+      opacity: 0;
+      transform: scale(0.95);
     }
-    to { 
-      opacity: 1; 
-      transform: scale(1); 
+
+    to {
+      opacity: 1;
+      transform: scale(1);
     }
   }
 
   @keyframes pulseSuuble {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.7;
+    }
   }
 }
