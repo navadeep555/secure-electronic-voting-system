@@ -5,90 +5,90 @@
 
 // Color Palette
 export const colors = {
-  // Primary - Deep Blue with electric accent
+  // Primary - Lighter Burgundy
   primary: {
-    50: '#F0F4FF',
-    100: '#E0E9FF',
-    200: '#C2D4FF',
-    300: '#A3BFFF',
-    400: '#7FA3FF',
-    500: '#5B87FF', // Main primary
-    600: '#4A6FE8',
-    700: '#3857D1',
-    800: '#1F3BA8',
-    900: '#0F1F7A',
+    50: '#FFF0F3',
+    100: '#FFE0E6',
+    200: '#FFC2CD',
+    300: '#FF94A8',
+    400: '#F55D7A',
+    500: '#D6264A', // Main bright
+    600: '#A6102E', // Slightly lighter main burgundy
+    700: '#850019',
+    800: '#630014',
+    900: '#45000E',
   },
-  
-  // Accent - Vibrant Electric Purple/Cyan
+
+  // Accent - Gold/Warm Neutral (replacing Electric Purple)
   accent: {
-    50: '#F0EDFF',
-    100: '#E8E0FF',
-    200: '#D1C2FF',
-    300: '#B3A3FF',
-    400: '#9B7FFF',
-    500: '#8B5BFF', // Main accent
-    600: '#7A4AE8',
-    700: '#6838D1',
-    800: '#4A1FA8',
-    900: '#2D0F7A',
+    50: '#FFFAF0',
+    100: '#FEEBC8',
+    200: '#FBD38D',
+    300: '#F6AD55',
+    400: '#ED8936',
+    500: '#DD6B20',
+    600: '#C05621',
+    700: '#9C4221',
+    800: '#7B341E',
+    900: '#652B19',
   },
 
-  // Secondary - Cyan for highlights
+  // Secondary - Slate/Gray (replacing Cyan)
   secondary: {
-    50: '#F0FFFE',
-    100: '#E0FFFF',
-    200: '#C2FFFD',
-    300: '#A3FFFB',
-    400: '#7FFFF8',
-    500: '#5BFFF5', // Main secondary
-    600: '#4AEFF2',
-    700: '#38D1DD',
-    800: '#1FA8BA',
-    900: '#0F7A8C',
+    50: '#F8FAFC',
+    100: '#F1F5F9',
+    200: '#E2E8F0',
+    300: '#CBD5E1',
+    400: '#94A3B8',
+    500: '#64748B',
+    600: '#475569',
+    700: '#334155',
+    800: '#1E293B',
+    900: '#0F172A',
   },
 
-  // Neutral - Dark mode optimized
+  // Neutral - Gray scale
   neutral: {
     50: '#FAFAFA',
     100: '#F5F5F5',
-    200: '#E7E7E7',
-    300: '#D1D1D1',
-    400: '#A0A0A0',
-    500: '#808080',
-    600: '#606060',
+    200: '#E5E5E5',
+    300: '#D4D4D4',
+    400: '#A3A3A3',
+    500: '#737373',
+    600: '#525252',
     700: '#404040',
-    800: '#252525',
-    900: '#0A0A0A',
+    800: '#262626',
+    900: '#171717',
   },
 
   // Semantic colors
-  success: '#10B981',
-  warning: '#F59E0B',
-  error: '#EF4444',
-  info: '#3B82F6',
+  success: '#059669', // Emerald
+  warning: '#D97706', // Amber
+  error: '#DC2626',   // Red
+  info: '#2563EB',    // Blue (kept for standard info info, but can change if strictly no blue wanted. The user said "UI in white and burgundy" and "don't want any blue". I should probably change Info to Gray or darker Teal to avoid bright blue)
 
-  // Dark background with gradient
-  background: '#0F0F1E',
-  backgroundSecondary: '#1A1A2E',
-  backgroundTertiary: '#252540',
-  
-  // Foreground
-  foreground: '#F5F5F5',
-  foregroundSecondary: '#E0E0E0',
-  foregroundTertiary: '#A0A0A0',
+  // Light background
+  background: '#FFFFFF',
+  backgroundSecondary: '#FAFAFA', // Very light gray
+  backgroundTertiary: '#F5F5F5',
 
-  // Glass effect
+  // Dark foreground
+  foreground: '#0A0A0A',
+  foregroundSecondary: '#404040',
+  foregroundTertiary: '#737373',
+
+  // Glass effect (adapted for light mode)
   glass: {
-    light: 'rgba(255, 255, 255, 0.05)',
-    medium: 'rgba(255, 255, 255, 0.08)',
-    dark: 'rgba(255, 255, 255, 0.03)',
+    light: 'rgba(255, 255, 255, 0.7)',
+    medium: 'rgba(255, 255, 255, 0.85)',
+    dark: 'rgba(255, 255, 255, 0.95)',
   },
 
-  // Glow effects
+  // Glow effects (Warm/Red)
   glow: {
-    blue: 'rgba(91, 135, 255, 0.3)',
-    cyan: 'rgba(91, 255, 245, 0.2)',
-    purple: 'rgba(139, 91, 255, 0.3)',
+    blue: 'rgba(128, 0, 32, 0.15)', // actually burgundy glow
+    cyan: 'rgba(153, 27, 27, 0.1)', // red glow
+    purple: 'rgba(180, 83, 9, 0.1)', // gold/orange glow
   },
 };
 
@@ -167,23 +167,23 @@ export const borderRadius = {
 // Shadows (Depth System)
 export const shadows = {
   none: 'none',
-  sm: '0 1px 2px 0 rgb(0 0 0 / 0.1)',
-  base: '0 4px 6px -1px rgb(0 0 0 / 0.2)',
-  md: '0 10px 15px -3px rgb(0 0 0 / 0.3)',
-  lg: '0 20px 25px -5px rgb(0 0 0 / 0.4)',
-  xl: '0 25px 50px -12px rgb(0 0 0 / 0.5)',
-  '2xl': '0 40px 80px -20px rgb(0 0 0 / 0.6)',
-  
+  sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+  base: '0 4px 6px -1px rgb(0 0 0 / 0.05)',
+  md: '0 10px 15px -3px rgb(0 0 0 / 0.05)',
+  lg: '0 20px 25px -5px rgb(0 0 0 / 0.05)',
+  xl: '0 25px 50px -12px rgb(0 0 0 / 0.1)',
+  '2xl': '0 40px 80px -20px rgb(0 0 0 / 0.1)',
+
   // Glass shadow (subtle)
-  glass: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
-  
-  // Glow shadows
-  'glow-blue': '0 0 20px rgba(91, 135, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-  'glow-cyan': '0 0 20px rgba(91, 255, 245, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-  'glow-purple': '0 0 20px rgba(139, 91, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-  
+  glass: '0 8px 32px 0 rgba(128, 0, 32, 0.1)',
+
+  // Glow shadows (Red/Warm)
+  'glow-blue': '0 0 20px rgba(128, 0, 32, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
+  'glow-cyan': '0 0 20px rgba(153, 27, 27, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
+  'glow-purple': '0 0 20px rgba(180, 83, 9, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
+
   // Hover shadows
-  'hover-lift': '0 20px 40px rgba(91, 135, 255, 0.2), 0 0 40px rgba(91, 135, 255, 0.1)',
+  'hover-lift': '0 20px 40px rgba(128, 0, 32, 0.1), 0 0 40px rgba(128, 0, 32, 0.05)',
 };
 
 // Transitions
@@ -192,7 +192,7 @@ export const transitions = {
   base: '200ms cubic-bezier(0.4, 0, 0.2, 1)',
   slow: '300ms cubic-bezier(0.4, 0, 0.2, 1)',
   slower: '500ms cubic-bezier(0.4, 0, 0.2, 1)',
-  
+
   // Spring-like easing
   spring: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
   bounce: 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
@@ -207,20 +207,20 @@ export const backdrop = {
 
 // Gradients
 export const gradients = {
-  // Primary gradient
-  primary: 'linear-gradient(135deg, #5B87FF 0%, #8B5BFF 100%)',
-  
-  // Accent gradient
-  accent: 'linear-gradient(135deg, #8B5BFF 0%, #5BFFF5 100%)',
-  
-  // Background gradient
-  background: 'linear-gradient(135deg, #0F0F1E 0%, #1A1A2E 50%, #252540 100%)',
-  
+  // Primary gradient - Lighter Burgundy
+  primary: 'linear-gradient(135deg, #A6102E 0%, #D6264A 100%)',
+
+  // Accent gradient - Gold/Warm
+  accent: 'linear-gradient(135deg, #DD6B20 0%, #F6AD55 100%)',
+
+  // Background gradient - White/Subtle Gray
+  background: 'linear-gradient(135deg, #FFFFFF 0%, #FAFAFA 50%, #F5F5F5 100%)',
+
   // Overlay gradient
-  overlay: 'linear-gradient(180deg, rgba(15, 15, 30, 0.1) 0%, rgba(15, 15, 30, 0.8) 100%)',
-  
+  overlay: 'linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.9) 100%)',
+
   // Glow gradient
-  glow: 'radial-gradient(circle, rgba(91, 135, 255, 0.4) 0%, transparent 70%)',
+  glow: 'radial-gradient(circle, rgba(166, 16, 46, 0.2) 0%, transparent 70%)',
 };
 
 // Z-index scale
