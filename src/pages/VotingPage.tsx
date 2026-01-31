@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,11 @@ import {
   Lock,
   AlertTriangle,
   FileCheck,
-  Flag
+  Flag,
+  Fingerprint,
+  RefreshCw,
+  Server,
+  FileKey
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -27,15 +31,50 @@ export default function VotingPage() {
   const { electionId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [step, setStep] = useState<"select" | "confirm" | "complete">("select");
+  const [step, setStep] = useState<"select" | "confirm" | "encrypting" | "anonymizing" | "complete">("select");
   const [selectedCandidate, setSelectedCandidate] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Animation States
+  const [encryptionProgress, setEncryptionProgress] = useState(0);
+  const [anonymizationStep, setAnonymizationStep] = useState(0);
 
   const handleSubmitVote = async () => {
-    setIsSubmitting(true);
-    // Simulate cryptographic delay
-    await new Promise((resolve) => setTimeout(resolve, 2500));
-    setIsSubmitting(false);
+    // Step 1: Encryption Animation
+    setStep("encrypting");
+
+    // Simulate Encryption Progress
+    const encryptInterval = setInterval(() => {
+      setEncryptionProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(encryptInterval);
+          // Move to next step after small pause
+          setTimeout(() => startAnonymization(), 800);
+          return 100;
+        }
+        return prev + 5;
+      });
+    }, 100);
+  };
+
+  const startAnonymization = () => {
+    setStep("anonymizing");
+    // Sequence of visual steps for anonymity
+    // 0: Start
+    // 1: Detach ID
+    // 2: Shuffle
+    // 3: Complete
+    let currentStep = 0;
+    const anonInterval = setInterval(() => {
+      currentStep++;
+      setAnonymizationStep(currentStep);
+      if (currentStep >= 3) {
+        clearInterval(anonInterval);
+        setTimeout(() => finishVoting(), 1000);
+      }
+    }, 1200);
+  };
+
+  const finishVoting = () => {
     setStep("complete");
     toast({
       title: "Vote Recorded",
@@ -47,43 +86,47 @@ export default function VotingPage() {
     return (
       <PageWrapper>
         <Layout>
-          <div className="min-h-screen bg-neutral-100 flex items-center justify-center py-12 px-4">
-            <div className="bg-white max-w-lg w-full p-10 rounded-sm shadow-md border-t-4 border-green-600 text-center relative overflow-hidden">
+          <div className="min-h-[80vh] bg-neutral-100 flex items-center justify-center py-12 px-4">
+            <div className="bg-white max-w-lg w-full p-10 rounded-sm shadow-xl border-t-8 border-green-600 text-center relative overflow-hidden animate-in zoom-in-95 duration-500">
               {/* Background Watermark */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-5 pointer-events-none">
-                <Shield className="h-64 w-64 text-neutral-900" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.03] pointer-events-none">
+                <Shield className="h-[400px] w-[400px] text-neutral-900" />
               </div>
 
-              <div className="w-24 h-24 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-6 border-4 border-green-100">
-                <CheckCircle2 className="h-12 w-12 text-green-600" />
+              <div className="w-28 h-28 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-6 border-4 border-green-100 shadow-inner animate-in slide-in-from-bottom-5 duration-700">
+                <CheckCircle2 className="h-14 w-14 text-green-600" />
               </div>
 
-              <h1 className="text-3xl font-display font-bold text-neutral-900 mb-2">Vote Cast Successfully</h1>
+              <h1 className="text-3xl font-display font-bold text-neutral-900 mb-2">Vote Recorded</h1>
               <p className="text-neutral-500 mb-8 font-medium">
                 Official Ballot Receipt
               </p>
 
-              <div className="bg-neutral-50 border border-neutral-200 p-6 rounded-sm mb-8 text-left">
-                <div className="flex justify-between items-center mb-4 border-b border-neutral-200 pb-2">
-                  <span className="text-xs font-bold uppercase text-neutral-500">Transaction ID</span>
-                  <span className="font-mono text-sm font-bold text-neutral-900">0x8F3...2A9</span>
+              <div className="bg-slate-50 border border-slate-200 p-6 rounded-sm mb-8 text-left relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-20 h-20 bg-green-500 rotate-45 translate-x-10 -translate-y-10" />
+
+                <div className="flex justify-between items-center mb-4 border-b border-slate-200 pb-3">
+                  <span className="text-xs font-bold uppercase text-slate-500 tracking-wider">Transaction Hash</span>
+                  <span className="font-mono text-xs font-bold text-slate-700 bg-slate-200 px-2 py-1 rounded">0x8F3a...2A9c</span>
                 </div>
-                <div className="flex justify-between items-center mb-4 border-b border-neutral-200 pb-2">
-                  <span className="text-xs font-bold uppercase text-neutral-500">Time Stamp</span>
-                  <span className="font-mono text-sm font-bold text-neutral-900">{new Date().toLocaleTimeString()}</span>
+                <div className="flex justify-between items-center mb-4 border-b border-slate-200 pb-3">
+                  <span className="text-xs font-bold uppercase text-slate-500 tracking-wider">Timestamp</span>
+                  <span className="font-mono text-sm font-bold text-slate-900">{new Date().toLocaleTimeString()}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold uppercase text-neutral-500">Status</span>
-                  <span className="text-sm font-bold text-green-700 flex items-center gap-1"><Lock className="h-3 w-3" /> Encrypted & Stored</span>
+                <div className="flex justify-between items-center bg-white p-3 rounded border border-slate-100 shadow-sm">
+                  <span className="text-xs font-bold uppercase text-slate-500 tracking-wider">Integrity Check</span>
+                  <span className="text-xs font-bold text-green-700 flex items-center gap-1.5 uppercase">
+                    <Shield className="h-3.5 w-3.5 fill-current" /> Verified Immutable
+                  </span>
                 </div>
               </div>
 
               <div className="flex flex-col gap-3">
-                <Button className="w-full bg-primary-900 hover:bg-black text-white py-6 uppercase font-bold tracking-wide rounded-sm" onClick={() => navigate("/dashboard/voter")}>
+                <Button className="w-full bg-slate-900 hover:bg-black text-white py-6 uppercase font-bold tracking-wide rounded-sm shadow-lg hover:shadow-xl transition-all" onClick={() => navigate("/dashboard/voter")}>
                   Return to Dashboard
                 </Button>
                 <Button variant="ghost" className="text-neutral-500 hover:text-neutral-900 text-sm">
-                  Download Receipt (PDF)
+                  <FileKey className="h-4 w-4 mr-2" /> Download Cryptographic Proof
                 </Button>
               </div>
             </div>
@@ -93,6 +136,101 @@ export default function VotingPage() {
     );
   }
 
+  // Animation Components
+  if (step === "encrypting") {
+    return (
+      <PageWrapper>
+        <Layout>
+          <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-8 text-white text-center">
+            <div className="w-full max-w-md">
+              <div className="mb-8 relative">
+                <Lock className={`h-24 w-24 mx-auto mb-6 text-emerald-400 transition-all duration-500 ${encryptionProgress === 100 ? 'scale-110 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)]' : 'scale-100'}`} />
+                {encryptionProgress < 100 && (
+                  <RefreshCw className="h-24 w-24 absolute top-0 left-1/2 -translate-x-1/2 animate-spin text-emerald-500/30" />
+                )}
+              </div>
+
+              <h2 className="text-2xl font-bold mb-2 tracking-tight">Encrypting Ballot</h2>
+              <p className="text-slate-400 mb-8 max-w-xs mx-auto text-sm">
+                Generating zero-knowledge proof and securing your selection with AES-256 encryption.
+              </p>
+
+              <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden mb-2 border border-slate-700">
+                <div
+                  className="h-full bg-emerald-500 transition-all duration-100 ease-linear shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                  style={{ width: `${encryptionProgress}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs font-mono text-emerald-500/80">
+                <span>init_hash()</span>
+                <span>{encryptionProgress}%</span>
+              </div>
+            </div>
+          </div>
+        </Layout>
+      </PageWrapper>
+    );
+  }
+
+  if (step === "anonymizing") {
+    return (
+      <PageWrapper>
+        <Layout>
+          <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-8 text-white text-center">
+            <div className="w-full max-w-2xl grid grid-cols-1 md:grid-cols-3 items-center gap-8 mb-12">
+
+              {/* User Identity Node */}
+              <div className={`flex flex-col items-center transition-all duration-700 ${anonymizationStep >= 1 ? 'opacity-30 scale-90 blur-sm' : 'opacity-100 scale-100'}`}>
+                <div className="w-20 h-20 rounded-full bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center mb-4">
+                  <Fingerprint className="h-10 w-10 text-blue-400" />
+                </div>
+                <p className="text-sm font-bold text-blue-200">Your Identity</p>
+              </div>
+
+              {/* Arrow / Connection */}
+              <div className="flex items-center justify-center relative h-12">
+                {anonymizationStep === 0 && (
+                  <div className="h-1 w-full bg-slate-700" />
+                )}
+                {anonymizationStep === 1 && (
+                  <div className="absolute flex gap-1">
+                    <span className="block w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                    <span className="text-xs text-red-400 font-mono uppercase">Severing Link</span>
+                  </div>
+                )}
+                {anonymizationStep >= 2 && (
+                  <div className="text-xs text-green-500 font-bold border border-green-500/50 px-3 py-1 rounded bg-green-500/10">
+                    ANONYMIZED
+                  </div>
+                )}
+              </div>
+
+              {/* Vote Data Node */}
+              <div className={`flex flex-col items-center transition-all duration-700 ${anonymizationStep >= 2 ? 'scale-110' : 'scale-100'}`}>
+                <div className="w-20 h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center mb-4 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+                  <FileKey className="h-10 w-10 text-emerald-400" />
+                </div>
+                <p className="text-sm font-bold text-emerald-200">Encrypted Vote</p>
+              </div>
+            </div>
+
+            <h2 className="text-2xl font-bold mb-4">
+              {anonymizationStep === 0 && "Verifying Eligibility..."}
+              {anonymizationStep === 1 && "Separating Identity from Ballot..."}
+              {anonymizationStep >= 2 && "Submitting Anonymous Token..."}
+            </h2>
+            <div className="flex gap-2 justify-center">
+              <div className={`w-3 h-3 rounded-full transition-colors ${anonymizationStep >= 1 ? 'bg-blue-500' : 'bg-slate-700'}`} />
+              <div className={`w-3 h-3 rounded-full transition-colors ${anonymizationStep >= 2 ? 'bg-emerald-500' : 'bg-slate-700'}`} />
+              <div className={`w-3 h-3 rounded-full transition-colors ${anonymizationStep >= 3 ? 'bg-white' : 'bg-slate-700'}`} />
+            </div>
+          </div>
+        </Layout>
+      </PageWrapper>
+    )
+  }
+
+  // STANDARD VIEW (Selection & Confirmation)
   return (
     <PageWrapper>
       <Layout>
@@ -150,7 +288,6 @@ export default function VotingPage() {
                             : "border-neutral-200 hover:border-primary-400 bg-white"
                             }`}
                         >
-                          {/* Radio Indicator */}
                           <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${selectedCandidate === candidate.id ? "border-primary-700" : "border-neutral-300 group-hover:border-primary-400"
                             }`}>
                             {selectedCandidate === candidate.id && <div className="w-3 h-3 bg-primary-700 rounded-full" />}
@@ -218,8 +355,8 @@ export default function VotingPage() {
                       <Button variant="outline" className="flex-1 max-w-[200px] border-neutral-300 text-neutral-600 hover:bg-neutral-100 uppercase font-bold tracking-wide py-6 rounded-sm" onClick={() => setStep("select")}>
                         <ArrowLeft className="h-4 w-4 mr-2" /> Change
                       </Button>
-                      <Button className="flex-1 max-w-[200px] bg-green-700 hover:bg-green-800 text-white uppercase font-bold tracking-wide py-6 rounded-sm shadow-md" onClick={handleSubmitVote} disabled={isSubmitting}>
-                        {isSubmitting ? "Submitting..." : <><Lock className="h-4 w-4 mr-2" /> Confirm Vote</>}
+                      <Button className="flex-1 max-w-[200px] bg-green-700 hover:bg-green-800 text-white uppercase font-bold tracking-wide py-6 rounded-sm shadow-md" onClick={handleSubmitVote} >
+                        <Lock className="h-4 w-4 mr-2" /> Confirm Vote
                       </Button>
                     </div>
                   </>

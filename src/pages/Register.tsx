@@ -75,15 +75,16 @@ interface PersonalInfo {
   fullName: string;
   dateOfBirth: string;
   aadhaarNumber: string;
+  phoneNumber: string;
   state: string;
   district: string;
 }
 
 interface DocumentUpload {
-  aadhaarFile: File | null;
-  voterIdFile: File | null;
-  aadhaarPreview: string;
-  voterIdPreview: string;
+  voterFrontFile: File | null;
+  voterBackFile: File | null;
+  voterFrontPreview: string;
+  voterBackPreview: string;
   voterIdVerified: boolean;
 }
 
@@ -100,15 +101,16 @@ export default function Register() {
     fullName: "",
     dateOfBirth: "",
     aadhaarNumber: "",
+    phoneNumber: "",
     state: "",
     district: "",
   });
 
   const [documentUpload, setDocumentUpload] = useState<DocumentUpload>({
-    aadhaarFile: null,
-    voterIdFile: null,
-    aadhaarPreview: "",
-    voterIdPreview: "",
+    voterFrontFile: null,
+    voterBackFile: null,
+    voterFrontPreview: "",
+    voterBackPreview: "",
     voterIdVerified: false,
   });
 
@@ -410,13 +412,14 @@ export default function Register() {
     if (!personalInfo.dateOfBirth) newErrors.dateOfBirth = "Required";
     else if (!validateAge(personalInfo.dateOfBirth)) newErrors.dateOfBirth = "Must be 18+";
     if (!validateAadhaar(personalInfo.aadhaarNumber)) newErrors.aadhaarNumber = "Invalid Aadhaar";
+    if (!/^\d{10}$/.test(personalInfo.phoneNumber)) newErrors.phoneNumber = "Invalid 10-digit number";
     if (!personalInfo.state) newErrors.state = "Required";
     if (!personalInfo.district) newErrors.district = "Required";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const validateStep2 = () => documentUpload.aadhaarFile && documentUpload.voterIdFile && documentUpload.voterIdVerified;
+  const validateStep2 = () => documentUpload.voterFrontFile && documentUpload.voterBackFile && documentUpload.voterIdVerified;
 
   const handleNextStep = () => {
     if (currentStep === 1 && !validateStep1()) return;
@@ -454,7 +457,7 @@ export default function Register() {
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, field: "aadhaarFile" | "voterIdFile") => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, field: "voterFrontFile" | "voterBackFile") => {
     const file = event.target.files?.[0];
     if (file && file.size <= 5 * 1024 * 1024) {
       const reader = new FileReader();
@@ -463,11 +466,11 @@ export default function Register() {
         setDocumentUpload((prev) => ({
           ...prev,
           [field]: file,
-          [field === "aadhaarFile" ? "aadhaarPreview" : "voterIdPreview"]: base64Image,
-          ...(field === "voterIdFile" ? { voterIdVerified: false } : {}),
+          [field === "voterFrontFile" ? "voterFrontPreview" : "voterBackPreview"]: base64Image,
+          ...(field === "voterFrontFile" ? { voterIdVerified: false } : {}),
         }));
 
-        if (field === "voterIdFile") {
+        if (field === "voterFrontFile") {
           setIsVerifying(true);
           try {
             const result = await verifyDocument(base64Image, personalInfo.fullName, personalInfo.dateOfBirth);
@@ -580,6 +583,14 @@ export default function Register() {
                             {errors.aadhaarNumber && <p className="text-red-600 text-xs flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {errors.aadhaarNumber}</p>}
                           </div>
                           <div className="space-y-2">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wide">Phone Number</label>
+                            <input type="text" value={personalInfo.phoneNumber} onChange={e => {
+                              const val = e.target.value.replace(/\D/g, "");
+                              if (val.length <= 10) setPersonalInfo({ ...personalInfo, phoneNumber: val });
+                            }} className="w-full p-3 border border-neutral-300 rounded-sm focus:ring-1 focus:ring-primary-700 bg-neutral-50 font-mono" placeholder="9876543210" />
+                            {errors.phoneNumber && <p className="text-red-600 text-xs flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {errors.phoneNumber}</p>}
+                          </div>
+                          <div className="space-y-2">
                             <label className="text-xs font-bold text-neutral-500 uppercase tracking-wide">State</label>
                             <select value={personalInfo.state} onChange={e => setPersonalInfo({ ...personalInfo, state: e.target.value, district: "" })} className="w-full p-3 border border-neutral-300 rounded-sm focus:ring-1 focus:ring-primary-700 bg-neutral-50">
                               <option value="">Select State</option>
@@ -605,42 +616,48 @@ export default function Register() {
 
                     {/* STEP 2: DOCUMENTS */}
                     {currentStep === 2 && (
-                      <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
-                        {/* Document Upload Blocks */}
-                        {[{ id: 'aadhaar', label: 'Aadhaar Card', file: documentUpload.aadhaarFile, preview: documentUpload.aadhaarPreview, field: 'aadhaarFile' },
-                        { id: 'voter', label: 'Voter ID', file: documentUpload.voterIdFile, preview: documentUpload.voterIdPreview, field: 'voterIdFile' }
-                        ].map((doc: any) => (
-                          <div key={doc.id} className="border-2 border-dashed border-neutral-300 rounded-sm p-6 hover:border-primary-500 transition-colors bg-neutral-50">
-                            <div className="flex flex-col items-center justify-center space-y-4">
-                              {doc.file ? (
-                                <>
-                                  <img src={doc.preview} className="h-32 object-contain border border-neutral-200 rounded-sm shadow-sm" />
-                                  <div className="text-center">
-                                    <p className="text-sm font-bold text-neutral-700">{doc.label} Uploaded</p>
-                                    <p className="text-xs text-green-600 flex items-center justify-center gap-1"><CheckCircle2 className="h-3 w-3" /> {doc.file.name}</p>
-                                    {doc.id === 'voter' && (
-                                      isVerifying ? <p className="text-xs text-amber-600 mt-1">Verifying...</p> :
-                                        documentUpload.voterIdVerified ? <p className="text-xs text-green-700 mt-1 font-bold">Verified Official Document</p> :
-                                          verificationError ? <p className="text-xs text-red-600 mt-1">{verificationError}</p> : null
-                                    )}
-                                  </div>
-                                </>
-                              ) : (
-                                <>
-                                  <Upload className="h-10 w-10 text-neutral-300" />
-                                  <div className="text-center">
-                                    <p className="font-bold text-neutral-700">Upload {doc.label}</p>
-                                    <p className="text-xs text-neutral-400">JPG, PNG (Max 5MB)</p>
-                                  </div>
-                                  <label className="cursor-pointer bg-white border border-neutral-300 text-neutral-700 px-4 py-2 rounded-sm text-sm font-bold hover:bg-neutral-50 shadow-sm">
-                                    Select File
-                                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, doc.field)} />
-                                  </label>
-                                </>
-                              )}
-                            </div>
+                      <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+
+                        <div className="bg-neutral-50 border border-neutral-200 rounded-sm p-6">
+                          <h3 className="font-bold text-neutral-900 mb-6 text-center border-b border-neutral-200 pb-4">Upload Voter ID</h3>
+
+                          <div className="grid md:grid-cols-2 gap-6">
+                            {[{ id: 'voterFront', label: 'Image 1 (Front)', file: documentUpload.voterFrontFile, preview: documentUpload.voterFrontPreview, field: 'voterFrontFile' },
+                            { id: 'voterBack', label: 'Image 2 (Back)', file: documentUpload.voterBackFile, preview: documentUpload.voterBackPreview, field: 'voterBackFile' }
+                            ].map((doc: any) => (
+                              <div key={doc.id} className="border-2 border-dashed border-neutral-300 rounded-sm p-6 hover:border-primary-500 transition-colors bg-white">
+                                <div className="flex flex-col items-center justify-center space-y-4">
+                                  {doc.file ? (
+                                    <>
+                                      <img src={doc.preview} className="h-32 object-contain border border-neutral-200 rounded-sm shadow-sm" />
+                                      <div className="text-center">
+                                        <p className="text-sm font-bold text-neutral-700">{doc.label}</p>
+                                        <p className="text-xs text-green-600 flex items-center justify-center gap-1"><CheckCircle2 className="h-3 w-3" /> {doc.file.name}</p>
+                                        {doc.id === 'voterFront' && (
+                                          isVerifying ? <p className="text-xs text-amber-600 mt-1">Verifying...</p> :
+                                            documentUpload.voterIdVerified ? <p className="text-xs text-green-700 mt-1 font-bold">Verified Official Document</p> :
+                                              verificationError ? <p className="text-xs text-red-600 mt-1">{verificationError}</p> : null
+                                        )}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Upload className="h-8 w-8 text-neutral-300" />
+                                      <div className="text-center">
+                                        <p className="font-bold text-neutral-700 text-sm">{doc.label}</p>
+                                        <p className="text-xs text-neutral-400">JPG, PNG (Max 5MB)</p>
+                                      </div>
+                                      <label className="cursor-pointer bg-neutral-50 border border-neutral-300 text-neutral-700 px-3 py-1.5 rounded-sm text-xs font-bold hover:bg-neutral-100 shadow-sm">
+                                        Select File
+                                        <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, doc.field)} />
+                                      </label>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        </div>
                       </motion.div>
                     )}
 

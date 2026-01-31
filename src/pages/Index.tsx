@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Shield, Vote, CheckCircle, Smartphone, Globe, Lock, ChevronRight, FileCheck, Users, BarChart3, ArrowRight } from "lucide-react";
+import { Shield, Vote, CheckCircle, Smartphone, Globe, Lock, ChevronRight, FileCheck, Users, BarChart3, ArrowRight, LayoutDashboard, Fingerprint } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { PageWrapper } from "@/components/PageWrapper";
 import { motion } from "framer-motion";
@@ -117,6 +117,8 @@ export default function Index() {
               </div>
             </div>
           </section>
+
+
 
           {/* FEATURES GRID */}
           <section className="py-24 bg-white">
