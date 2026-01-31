@@ -14,8 +14,8 @@ Follow these steps exactly when you first download the project.
 ### 2. Get the Code
 Open your terminal (Command Prompt or Terminal) and run:
 ```bash
-git clone https://github.com/AURA-stack-svg/secure_vote.git
-cd secure_vote
+git clone https://github.com/navadeep555/secure-electronic-voting-system.git
+cd secure-electronic-voting-system
 ```
 
 ### 3. Install Dependencies

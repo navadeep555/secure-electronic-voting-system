@@ -1,83 +1,107 @@
 import type { Config } from "tailwindcss";
 import tailwindcssAnimate from "tailwindcss-animate";
 
-// Import design tokens - convert to runtime values
+// ═══════════════════════════════════════════════════════════════
+// NATIONAL ELECTION PORTAL - DESIGN TOKENS
+// ═══════════════════════════════════════════════════════════════
+// MOOD: Elegant, Civic, Professional, Trustworthy
+// COLORS: Burgundy, Deep Maroon, Charcoal, Soft Gold, White
+// ═══════════════════════════════════════════════════════════════
+
 const designTokens = {
   colors: {
+    // BURGUNDY - The Authority Color
     primary: {
-      50: '#FFF0F3',
-      100: '#FFE0E6',
-      200: '#FFC2CD',
-      300: '#FF94A8',
-      400: '#F55D7A',
-      500: '#D6264A',
-      600: '#A6102E',
-      700: '#850019',
-      800: '#630014',
-      900: '#45000E',
+      50: "#fcf4f4",
+      100: "#f9e8e8",
+      200: "#f0d5d5",
+      300: "#e6b0b0",
+      400: "#d67d7d",
+      500: "#bc4c4c", // Base Red (for errors/alerts)
+      600: "#a33232",
+      700: "#800020", // The "Burgundy" Core
+      800: "#600018", // Deep Wine
+      900: "#4a0404", // Darkest Maroon
+      950: "#2a0202",
     },
+    // GOLD / BRASS - The Prestige Accent
     accent: {
-      50: '#FFFAF0',
-      100: '#FEEBC8',
-      500: '#DD6B20',
-      600: '#C05621',
-      700: '#9C4221',
+      50: "#fbf9f4",
+      100: "#f6f2e6",
+      200: "#eae0cc",
+      300: "#dac6a3",
+      400: "#c5a059", // Soft Gold
+      500: "#b08d4b",
+      600: "#997b3d", // Antique Brass
+      700: "#7a6231",
+      800: "#5e4b26",
+      900: "#42351b",
     },
+    // OFF-WHITE / PAPER - The "Document" Feel
     secondary: {
-      50: '#F8FAFC',
-      500: '#64748B',
-      600: '#475569',
-      700: '#334155',
+      50: "#f9fafb",
+      100: "#f3f4f6", // Paper
+      200: "#e5e7eb", // Light Border
+      300: "#d1d5db",
+      400: "#9ca3af",
+      500: "#6b7280",
+      600: "#4b5563",
+      700: "#374151", // Charcoal Light
+      800: "#1f2937", // Charcoal Dark
+      900: "#111827", // Almost Black
     },
     neutral: {
-      50: '#FAFAFA',
-      100: '#F5F5F5',
-      200: '#E5E5E5',
-      300: '#D4D4D4',
-      400: '#A3A3A3',
-      500: '#737373',
-      600: '#525252',
-      700: '#404040',
-      800: '#262626',
-      900: '#171717',
+      50: "#ffffff",
+      100: "#fafafa",
+      200: "#f4f4f5", // Light Gray Background
+      300: "#e4e4e7",
+      400: "#d4d4d8",
+      500: "#a1a1aa",
+      600: "#71717a",
+      700: "#52525b",
+      800: "#3f3f46", // Dark Gray Text
+      900: "#27272a", // Black Text
     },
+    // Semantic Colors (Standardized)
     semantic: {
-      success: "#059669",
-      warning: "#D97706",
-      error: "#DC2626",
-      info: "#2563EB",
+      success: "#166534", // Dark Green
+      warning: "#92400e", // Dark Amber
+      error: "#991b1b",   // Dark Red
+      info: "#1e3a8a",    // Dark Blue (Only for utility/info, not theme)
     },
     foreground: {
-      primary: "#0A0A0A",
-      secondary: "#404040",
-      tertiary: "#737373",
-    },
-    glow: {
-      blue: "rgba(128, 0, 32, 0.15)",
-      cyan: "rgba(153, 27, 27, 0.1)",
-      purple: "rgba(180, 83, 9, 0.1)",
+      primary: "#111827",   // Near Black
+      secondary: "#374151", // Dark Gray
+      tertiary: "#6b7280",  // Medium Gray
     },
   },
   borderRadius: {
-    xs: "0.25rem",
-    sm: "0.375rem",
-    md: "0.5rem",
-    lg: "0.75rem",
-    xl: "1rem",
-    "2xl": "1.5rem",
+    xs: "0rem",     // Sharp
+    sm: "0.125rem", // Very slight
+    md: "0.25rem",  // Slight
+    lg: "0.375rem", // Standard
+    xl: "0.5rem",   // Max for cards
+    "2xl": "0.5rem", // Cap at 0.5rem
+    "3xl": "0.5rem", // Cap at 0.5rem
+    full: "9999px",
   },
   shadows: {
-    "glow-blue": "0 0 30px rgba(128, 0, 32, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.5)",
-    "glow-cyan": "0 0 30px rgba(153, 27, 27, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5)",
-    "glow-purple": "0 0 30px rgba(180, 83, 9, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5)",
-    "hover-lift": "0 20px 40px rgba(128, 0, 32, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1)",
+    "card": "0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06)", // Subtle document shadow
+    "card-hover": "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)",
+    "elevated": "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)",
+    // REPLACING GLOWS WITH SUBTLE SHADOWS
+    "glow-blue": "none",
+    "glow-cyan": "none",
+    "glow-purple": "none",
+    "hover-lift": "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
   },
   gradients: {
-    primary: "linear-gradient(135deg, #A6102E 0%, #D6264A 100%)",
-    accent: "linear-gradient(135deg, #DD6B20 0%, #F6AD55 100%)",
-    background: "linear-gradient(135deg, #FFFFFF 0%, #FAFAFA 50%, #F5F5F5 100%)",
-    overlay: "linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.9) 100%)",
-    glow: "linear-gradient(135deg, rgba(128, 0, 32, 0.2) 0%, rgba(153, 27, 27, 0.1) 100%)",
+    // ELIMINATING NEON GRADIENTS
+    primary: "linear-gradient(to bottom, #800020, #600018)", // Burgundy Gradient
+    accent: "linear-gradient(to bottom, #c5a059, #997b3d)",  // Gold Gradient
+    background: "linear-gradient(to bottom, #ffffff, #f9fafb)", // Paper Gradient
+    overlay: "linear-gradient(to bottom, rgba(255,255,255,0.95), rgba(255,255,255,0.9))",
+    glow: "none",
   },
 };
 
@@ -92,16 +116,16 @@ export default {
       center: true,
       padding: "2rem",
       screens: {
-        "2xl": "1400px",
+        "2xl": "1200px", // More contained, readable width
       },
     },
     extend: {
       fontFamily: {
         sans: ["DM Sans", "system-ui", "sans-serif"],
-        display: ["Playfair Display", "Georgia", "serif"],
+        display: ["Playfair Display", "Georgia", "serif"], // Perfect for "Official" titles
       },
       colors: {
-        // Premium color palette
+        // Mapping token colors
         "primary-50": colors.primary[50],
         "primary-100": colors.primary[100],
         "primary-200": colors.primary[200],
@@ -112,15 +136,13 @@ export default {
         "primary-700": colors.primary[700],
         "primary-800": colors.primary[800],
         "primary-900": colors.primary[900],
+
         "accent-50": colors.accent[50],
         "accent-100": colors.accent[100],
         "accent-500": colors.accent[500],
         "accent-600": colors.accent[600],
         "accent-700": colors.accent[700],
-        "secondary-50": colors.secondary[50],
-        "secondary-500": colors.secondary[500],
-        "secondary-600": colors.secondary[600],
-        "secondary-700": colors.secondary[700],
+
         "neutral-50": colors.neutral[50],
         "neutral-100": colors.neutral[100],
         "neutral-200": colors.neutral[200],
@@ -131,64 +153,62 @@ export default {
         "neutral-700": colors.neutral[700],
         "neutral-800": colors.neutral[800],
         "neutral-900": colors.neutral[900],
+
         "semantic-success": colors.semantic.success,
         "semantic-warning": colors.semantic.warning,
         "semantic-error": colors.semantic.error,
         "semantic-info": colors.semantic.info,
+
         "foreground-primary": colors.foreground.primary,
         "foreground-secondary": colors.foreground.secondary,
         "foreground-tertiary": colors.foreground.tertiary,
-        // Legacy support
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+
+        // shadcn/ui overrides
+        border: colors.secondary[200],
+        input: colors.secondary[200],
+        ring: colors.primary[700], // Burgundy ring
+        background: colors.neutral[50], // White
+        foreground: colors.neutral[900], // Black text
+
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: colors.primary[700], // Burgundy
+          foreground: "#ffffff",
         },
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: colors.secondary[100], // Light Gray
+          foreground: colors.neutral[900],
         },
         destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
-        },
-        success: {
-          DEFAULT: "hsl(var(--success))",
-          foreground: "hsl(var(--success-foreground))",
-        },
-        warning: {
-          DEFAULT: "hsl(var(--warning))",
-          foreground: "hsl(var(--warning-foreground))",
+          DEFAULT: colors.semantic.error,
+          foreground: "#ffffff",
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: colors.secondary[100],
+          foreground: colors.secondary[500],
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: colors.accent[400], // Gold
+          foreground: colors.neutral[900],
         },
         popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+          DEFAULT: "#ffffff",
+          foreground: colors.neutral[900],
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+          DEFAULT: "#ffffff",
+          foreground: colors.neutral[900],
         },
-        sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
+        success: {
+          DEFAULT: colors.semantic.success,
+          foreground: "#ffffff",
+        },
+        warning: {
+          DEFAULT: colors.semantic.warning,
+          foreground: "#ffffff",
+        },
+        info: {
+          DEFAULT: colors.semantic.info,
+          foreground: "#ffffff",
         },
       },
       borderRadius: {
@@ -198,74 +218,37 @@ export default {
         lg: borderRadius.lg,
         xl: borderRadius.xl,
         "2xl": borderRadius["2xl"],
-      },
-      keyframes: {
-        "accordion-down": {
-          from: { height: "0" },
-          to: { height: "var(--radix-accordion-content-height)" },
-        },
-        "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: "0" },
-        },
-        "fade-in": {
-          from: { opacity: "0" },
-          to: { opacity: "1" },
-        },
-        "slide-up": {
-          from: { opacity: "0", transform: "translateY(20px)" },
-          to: { opacity: "1", transform: "translateY(0)" },
-        },
-        "slide-down": {
-          from: { opacity: "0", transform: "translateY(-10px)" },
-          to: { opacity: "1", transform: "translateY(0)" },
-        },
-        "scale-in": {
-          from: { opacity: "0", transform: "scale(0.95)" },
-          to: { opacity: "1", transform: "scale(1)" },
-        },
-        "glow-pulse": {
-          "0%, 100%": { opacity: "0.5" },
-          "50%": { opacity: "1" },
-        },
-      },
-      animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
-        "fade-in": "fade-in 0.5s ease-out forwards",
-        "slide-up": "slide-up 0.5s ease-out forwards",
-        "slide-down": "slide-down 0.3s ease-out forwards",
-        "scale-in": "scale-in 0.3s ease-out forwards",
-        "glow-pulse": "glow-pulse 3s ease-in-out infinite",
+        "3xl": borderRadius["3xl"],
+        // Specific override for "clean" UI
+        DEFAULT: borderRadius.md,
       },
       boxShadow: {
-        "glow-blue": shadows["glow-blue"],
-        "glow-cyan": shadows["glow-cyan"],
-        "glow-purple": shadows["glow-purple"],
-        "hover-lift": shadows["hover-lift"],
-        card: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06)",
-        elevated: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.06)",
-        glow: "0 0 30px rgba(128, 0, 32, 0.3)",
-      },
-      backdropFilter: {
-        glass: "blur(10px)",
-        "glass-xl": "blur(16px)",
+        "card": shadows.card,
+        "card-hover": shadows["card-hover"],
+        "elevated": shadows.elevated,
+        // Remove glows
+        "glow-blue": "none",
+        "glow-cyan": "none",
+        "glow-purple": "none",
+        "glow": "none",
       },
       backgroundImage: {
         "gradient-primary": gradients.primary,
         "gradient-accent": gradients.accent,
         "gradient-background": gradients.background,
         "gradient-overlay": gradients.overlay,
-        "gradient-glow": gradients.glow,
+        "hero-pattern": "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")",
+      },
+      // SLOW DOWN ANIMATIONS for "Serious" feel
+      animation: {
+        "fade-in": "fadeIn 0.8s ease-out forwards", // Slower
+        "slide-up": "slideUp 0.8s ease-out forwards",
       },
       transitionDuration: {
-        instant: "50ms",
-        micro: "100ms",
-        fast: "200ms",
-        base: "300ms",
+        DEFAULT: "200ms",
+        fast: "150ms",
+        medium: "300ms",
         slow: "500ms",
-        slower: "800ms",
-        slowest: "1200ms",
       },
     },
   },

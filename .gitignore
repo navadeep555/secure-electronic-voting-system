@@ -16,3 +16,7 @@ env/
 face_data/
 encodings/
 .DS_Store
+<<<<<<< HEAD
+=======
+fix_env.sh
+>>>>>>> d3a861fe8c5b2ca5dc6fa5fc7e942020fbf89a92

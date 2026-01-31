@@ -27,8 +27,8 @@ SecureVote Identity is a secure, biometric-enabled identity verification system 
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/AURA-stack-svg/secure_vote.git
-    cd secure_vote
+    git clone https://github.com/navadeep555/secure-electronic-voting-system.git
+    cd secure-electronic-voting-system
     ```
 
 2.  **Frontend Setup:**

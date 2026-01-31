@@ -67,7 +67,7 @@ export function Header() {
         <div className="hidden md:flex items-center gap-4">
           <Link to="/login">
             <Button variant="ghost" size="sm" className="font-semibold text-neutral-700 hover:bg-neutral-100 uppercase text-xs tracking-wider">
-              Login
+              Voter Login
             </Button>
           </Link>
           <Link to="/register">
@@ -109,7 +109,7 @@ export function Header() {
               <div className="flex flex-col gap-3 pt-4">
                 <Link to="/login" onClick={() => setIsOpen(false)}>
                   <Button variant="outline" className="w-full border-neutral-300 font-bold uppercase text-xs">
-                    Login
+                    Voter Login
                   </Button>
                 </Link>
                 <Link to="/register" onClick={() => setIsOpen(false)}>
