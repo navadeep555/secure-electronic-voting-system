@@ -75,6 +75,7 @@ interface PersonalInfo {
   fullName: string;
   dateOfBirth: string;
   aadhaarNumber: string;
+  phoneNumber: string;
   state: string;
   district: string;
 }
@@ -100,6 +101,7 @@ export default function Register() {
     fullName: "",
     dateOfBirth: "",
     aadhaarNumber: "",
+    phoneNumber: "",
     state: "",
     district: "",
   });
@@ -410,6 +412,7 @@ export default function Register() {
     if (!personalInfo.dateOfBirth) newErrors.dateOfBirth = "Required";
     else if (!validateAge(personalInfo.dateOfBirth)) newErrors.dateOfBirth = "Must be 18+";
     if (!validateAadhaar(personalInfo.aadhaarNumber)) newErrors.aadhaarNumber = "Invalid Aadhaar";
+    if (!/^\d{10}$/.test(personalInfo.phoneNumber)) newErrors.phoneNumber = "Invalid 10-digit number";
     if (!personalInfo.state) newErrors.state = "Required";
     if (!personalInfo.district) newErrors.district = "Required";
     setErrors(newErrors);
@@ -578,6 +581,14 @@ export default function Register() {
                               if (val.length <= 12) setPersonalInfo({ ...personalInfo, aadhaarNumber: val.replace(/(\d{4})(?=\d)/g, "$1 ") });
                             }} className="w-full p-3 border border-neutral-300 rounded-sm focus:ring-1 focus:ring-primary-700 bg-neutral-50 font-mono" placeholder="0000 0000 0000" />
                             {errors.aadhaarNumber && <p className="text-red-600 text-xs flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {errors.aadhaarNumber}</p>}
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wide">Phone Number</label>
+                            <input type="text" value={personalInfo.phoneNumber} onChange={e => {
+                              const val = e.target.value.replace(/\D/g, "");
+                              if (val.length <= 10) setPersonalInfo({ ...personalInfo, phoneNumber: val });
+                            }} className="w-full p-3 border border-neutral-300 rounded-sm focus:ring-1 focus:ring-primary-700 bg-neutral-50 font-mono" placeholder="9876543210" />
+                            {errors.phoneNumber && <p className="text-red-600 text-xs flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {errors.phoneNumber}</p>}
                           </div>
                           <div className="space-y-2">
                             <label className="text-xs font-bold text-neutral-500 uppercase tracking-wide">State</label>

@@ -38,8 +38,22 @@ export default function Login() {
       return;
     }
     setIsLoading(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    // Simulate API call check
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // ADMIN LOGIN CHECK
+    if (email === "admin" && password === "admin123") {
+      setIsLoading(false);
+      toast({
+        title: "Admin Access Granted",
+        description: "Redirecting to administration dashboard...",
+      });
+      navigate("/dashboard/admin");
+      return;
+    }
+
+    // VOTER LOGIN FLOW
     setIsLoading(false);
     setStep("otp");
     toast({
@@ -88,7 +102,7 @@ export default function Login() {
                 <Shield className="h-8 w-8 text-primary-700" />
               </div>
               <h1 className="text-2xl font-bold text-neutral-900 uppercase tracking-wide">
-                Voter Authentication
+                Secure System Access
               </h1>
               <p className="text-neutral-500 text-sm mt-2">
                 Secure Digital Identity Portal
@@ -138,17 +152,17 @@ export default function Login() {
                     <div className="space-y-4">
                       <div className="space-y-1">
                         <Label htmlFor="email" className="text-neutral-700 font-bold uppercase text-xs tracking-wide">
-                          Official Email ID
+                          User ID / Email
                         </Label>
                         <div className="relative">
                           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-neutral-400" />
                           <input
                             id="email"
-                            type="email"
+                            type="text"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             className="w-full pl-10 pr-4 py-3 bg-white border border-neutral-300 rounded-sm text-neutral-900 focus:ring-1 focus:ring-primary-700 focus:border-primary-700 focus:outline-none transition-all shadow-inner"
-                            placeholder="name@example.com"
+                            placeholder="Enter ID or Email"
                           />
                         </div>
                       </div>

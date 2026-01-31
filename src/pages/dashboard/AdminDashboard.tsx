@@ -22,6 +22,8 @@ import {
   Settings
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { AdminElectionsView } from "@/components/admin/AdminElectionsView";
+import { AdminVotersView } from "@/components/admin/AdminVotersView";
 
 const pendingVerifications = [
   { id: "1", name: "Jane Smith", email: "jane.smith@email.com", submittedAt: "2024-11-03 14:32", matchScore: 94, status: "pending" },
@@ -248,14 +250,27 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              {/* Placeholder Sections */}
-              {(activeSection === "elections" || activeSection === "voters") && (
-                <div className="bg-white rounded-sm shadow-sm border border-neutral-200 p-12 text-center">
-                  <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Settings className="h-8 w-8 text-neutral-400" />
+              {/* Elections Module */}
+              {activeSection === "elections" && (
+                <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                  <div className="mb-6 flex justify-between items-end">
+                    <div>
+                      <h2 className="text-2xl font-bold text-neutral-900">Election Management</h2>
+                      <p className="text-neutral-500">Create, monitor, and manage election lifecycles.</p>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-bold text-neutral-900">Module Under Construction</h3>
-                  <p className="text-neutral-500">This administrative module is currently being updated to the new secure standard.</p>
+                  <AdminElectionsView />
+                </div>
+              )}
+
+              {/* Voters Module */}
+              {activeSection === "voters" && (
+                <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-neutral-900">Voter Registry</h2>
+                    <p className="text-neutral-500">Manage voter identities, verification status, and participation.</p>
+                  </div>
+                  <AdminVotersView />
                 </div>
               )}
 
