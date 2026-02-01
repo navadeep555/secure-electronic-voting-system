@@ -438,7 +438,7 @@ export default function Register() {
     try {
       setIsProcessing(true);
       setDetectionMessage("Registering biometrics...");
-      const result = await registerUserFaces(personalInfo.aadhaarNumber.replace(/\s/g, ""), [
+      const result = await registerUserFaces(personalInfo.aadhaarNumber.replace(/\s/g, ""),personalInfo.phoneNumber, [
         biometricImages.stage1 || "",
         biometricImages.stage2 || "",
         biometricImages.stage3 || "",
