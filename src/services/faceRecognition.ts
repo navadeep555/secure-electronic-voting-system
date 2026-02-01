@@ -23,9 +23,11 @@ export interface RegistrationResult {
 
 /**
  * Register a user with 4 biometric face images
+ * ADDED: phoneNumber parameter to match backend requirements
  */
 export async function registerUserFaces(
   userId: string,
+  phoneNumber: string, // <-- Added this
   faceImages: string[] // 4 base64 images
 ): Promise<RegistrationResult> {
   try {
@@ -36,12 +38,14 @@ export async function registerUserFaces(
       },
       body: JSON.stringify({
         userId,
+        phoneNumber, // <-- Sending to backend now
         faceImages,
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorBody = await response.json();
+      throw new Error(errorBody.message || `HTTP error! status: ${response.status}`);
     }
 
     const result: RegistrationResult = await response.json();
@@ -163,13 +167,14 @@ export async function verifyDocument(
       },
       body: JSON.stringify({
         documentImage,
-        name,
-        dob,
+        fullName: name, // Matches data.get("fullName") in backend
+        dateOfBirth: dob, // Matches data.get("dateOfBirth") in backend
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorBody = await response.json();
+      throw new Error(errorBody.message || `HTTP error! status: ${response.status}`);
     }
 
     const result = await response.json();
