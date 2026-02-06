@@ -1,3 +1,5 @@
+
+
 import os
 import base64
 import numpy as np
@@ -181,109 +183,16 @@ def register_face():
 
 @app.route("/api/recognize-face", methods=["POST"])
 def recognize_face():
-    try:
-        data = request.json
+    print("🔥 recognize-face ROUTE ENTERED")
 
-        user_id = data.get("userId")
-        face_image = data.get("faceImage")
-        tolerance = float(data.get("tolerance", 0.6))  # optional
+    data = request.get_json(force=True, silent=True)
+    print("📦 DATA:", data)
 
-        if not user_id or not face_image:
-            return jsonify({
-                "success": False,
-                "message": "userId and faceImage are required"
-            }), 400
-
-        # Hash user ID
-        uid_hash = hash_data(user_id)
-
-        # Convert base64 → image
-        img_array = face_system.base64_to_image(face_image)
-        if img_array is None:
-            return jsonify({
-                "success": False,
-                "message": "Invalid image data"
-            }), 400
-
-        # Extract face encoding
-        test_encoding = face_system.get_face_encoding(img_array)
-        if test_encoding is None:
-            return jsonify({
-                "success": False,
-                "message": "No face detected"
-            }), 400
-
-        # Check registration
-        if uid_hash not in face_system.known_encodings:
-            return jsonify({
-                "success": False,
-                "message": "User not registered"
-            }), 404
-
-        # Compare face
-        known_encodings = face_system.known_encodings[uid_hash]
-        distances = face_recognition.face_distance(known_encodings, test_encoding)
-        min_distance = float(np.min(distances))
-
-        print(f"[DEBUG] Face distance for {uid_hash}: {min_distance}")
-
-        if min_distance > tolerance:
-            return jsonify({
-                "success": False,
-                "message": "Biometric mismatch"
-            }), 401
-
-        # DB check
-        conn = sqlite3.connect(DB_PATH)
-        cur = conn.cursor()
-
-        row = cur.execute(
-            "SELECT has_voted FROM users WHERE user_id_hash=?",
-            (uid_hash,)
-        ).fetchone()
-
-        if not row:
-            conn.close()
-            return jsonify({
-                "success": False,
-                "message": "User record not found"
-            }), 404
-
-        if row[0] == 1:
-            conn.close()
-            return jsonify({
-                "success": False,
-                "message": "User has already voted"
-            }), 403
-
-        # Generate OTP
-        otp = str(random.randint(100000, 999999))
-        otp_time = int(time.time())
-
-        cur.execute(
-            "UPDATE users SET otp=?, otp_time=? WHERE user_id_hash=?",
-            (otp, otp_time, uid_hash)
-        )
-
-        conn.commit()
-        conn.close()
-
-        # DEV ONLY: log OTP
-        print(f"📨 OTP for {uid_hash} → {otp}")
-
-        return jsonify({
-            "success": True,
-            "userIdHash": uid_hash,
-            "message": "Biometric verified. OTP generated."
-        })
-
-    except Exception as e:
-        print("❌ recognize-face error:")
-        print(traceback.format_exc())
-        return jsonify({
-            "success": False,
-            "message": "Internal server error"
-        }), 500
+    return jsonify({
+        "success": True,
+        "message": "TEST RESPONSE WORKING",
+        "debug_otp": "111111"
+    }), 200
 
 # =======================
 # OTP VERIFICATION

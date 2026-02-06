@@ -1,54 +1,44 @@
-/**
- * Face Recognition Service
- * Handles communication with Python facial recognition backend
- */
+
 
 const FACE_API_URL = "http://localhost:5001/api";
 
 export interface FaceRecognitionResult {
   success: boolean;
   message: string;
-  matched_user?: string;
-  distance?: number;
-  tolerance?: number;
-  all_matches?: Record<string, { min_distance: number; avg_distance: number; stages_matched: number }>;
+  userIdHash?: string;
+  debug_otp?: string;
+  otp?:string;
 }
 
 export interface RegistrationResult {
   success: boolean;
   message: string;
-  valid_faces?: number;
-  total_stages?: number;
 }
 
 /**
- * Register a user with 4 biometric face images
- * ADDED: phoneNumber parameter to match backend requirements
+ * Register a user with biometric face images
  */
 export async function registerUserFaces(
   userId: string,
-  phoneNumber: string, // <-- Added this
+  phoneNumber: string,
   faceImages: string[] // 4 base64 images
 ): Promise<RegistrationResult> {
   try {
     const response = await fetch(`${FACE_API_URL}/register-face`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         userId,
-        phoneNumber, // <-- Sending to backend now
+        phoneNumber,
         faceImages,
       }),
     });
 
+    const result = await response.json();
     if (!response.ok) {
-      const errorBody = await response.json();
-      throw new Error(errorBody.message || `HTTP error! status: ${response.status}`);
+      throw new Error(result.message || `HTTP error! status: ${response.status}`);
     }
 
-    const result: RegistrationResult = await response.json();
     console.log("✅ Registration result:", result);
     return result;
   } catch (error) {
@@ -61,29 +51,37 @@ export async function registerUserFaces(
 }
 
 /**
- * Recognize a user from a single face image
+ * Recognize a user using their ID and a captured face image
+ * MODIFIED: Now accepts userId to perform a 1-to-1 match on the backend
  */
+
 export async function recognizeUserFace(
+  userId: string, 
   faceImage: string, // base64 image
   tolerance: number = 0.6
 ): Promise<FaceRecognitionResult> {
+  console.log("➡️ Sending recognize-face payload", {
+  userId,
+  faceImagePresent: !!faceImage,
+  faceImageLength: faceImage?.length,
+});
+
   try {
     const response = await fetch(`${FACE_API_URL}/recognize-face`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        userId, // Added for backend optimization
         faceImage,
         tolerance,
       }),
     });
 
+    const result = await response.json();
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(result.message || `HTTP error! status: ${response.status}`);
     }
 
-    const result: FaceRecognitionResult = await response.json();
     console.log("🔍 Recognition result:", result);
     return result;
   } catch (error) {
@@ -96,95 +94,53 @@ export async function recognizeUserFace(
 }
 
 /**
- * Get list of all registered users
- */
-export async function getRegisteredUsers() {
-  try {
-    const response = await fetch(`${FACE_API_URL}/users`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-    console.log("👥 Registered users:", result);
-    return result;
-  } catch (error) {
-    console.error("❌ Error fetching users:", error);
-    return {
-      success: false,
-      message: `Failed to fetch users: ${error instanceof Error ? error.message : "Unknown error"}`,
-    };
-  }
-}
-
-/**
  * Check if face recognition server is running
  */
 export async function checkFaceServerHealth() {
   try {
     const response = await fetch(`${FACE_API_URL}/health`, {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-    console.log("✅ Server health:", result);
-    return result;
+    if (!response.ok) throw new Error(`Status: ${response.status}`);
+    return await response.json();
   } catch (error) {
     console.error("❌ Server health check failed:", error);
-    return {
-      status: "❌ Face Recognition Server is not running",
-      registered_users: 0,
-    };
+    return { status: "Offline", registered_users: 0 };
   }
 }
 
 /**
- * Verify a Voter ID document
+ * Verify a Voter ID document via OCR
  */
 export async function verifyDocument(
-  documentImage: string, // base64 image
+  documentImage: string,
   name: string,
   dob: string
-): Promise<{ success: boolean; message: string; extracted_text?: string }> {
+): Promise<{ success: boolean; message: string }> {
   try {
     const response = await fetch(`${FACE_API_URL}/verify-document`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         documentImage,
-        fullName: name, // Matches data.get("fullName") in backend
-        dateOfBirth: dob, // Matches data.get("dateOfBirth") in backend
+        fullName: name,
+        dateOfBirth: dob,
       }),
     });
 
+    const result = await response.json();
     if (!response.ok) {
-      const errorBody = await response.json();
-      throw new Error(errorBody.message || `HTTP error! status: ${response.status}`);
+      throw new Error(result.message || "Verification failed");
     }
 
-    const result = await response.json();
-    console.log("📝 Verification result:", result);
     return result;
   } catch (error) {
     console.error("❌ Verification error:", error);
     return {
       success: false,
-      message: `Verification failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+      message: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }
@@ -192,7 +148,6 @@ export async function verifyDocument(
 export default {
   registerUserFaces,
   recognizeUserFace,
-  getRegisteredUsers,
   checkFaceServerHealth,
   verifyDocument,
 };
