@@ -4,6 +4,12 @@ dist/
 build/
 .env
 
+# Database files
+voting_system.db
+*.db
+*.sqlite
+*.sqlite3
+
 # Python
 __pycache__/
 *.py[cod]
@@ -12,11 +18,12 @@ venv/
 env/
 .venv/
 
-# Project specific
+# Project specific (biometric data)
 face_data/
 encodings/
+
+# OS / Editor
 .DS_Store
-<<<<<<< HEAD
-=======
+
+# Scripts (optional)
 fix_env.sh
->>>>>>> d3a861fe8c5b2ca5dc6fa5fc7e942020fbf89a92

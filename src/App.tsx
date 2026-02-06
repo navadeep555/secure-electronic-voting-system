@@ -10,6 +10,7 @@ import VoterDashboard from "./pages/dashboard/VoterDashboard";
 import AdminDashboard from "./pages/dashboard/AdminDashboard";
 import ObserverDashboard from "./pages/dashboard/ObserverDashboard";
 import VotingPage from "./pages/VotingPage";
+import AlreadyVoted from "./pages/AlreadyVoted"; // 1. Import the new page
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,10 @@ const App = () => (
           <Route path="/dashboard/admin" element={<AdminDashboard />} />
           <Route path="/dashboard/observer" element={<ObserverDashboard />} />
           <Route path="/vote/:electionId" element={<VotingPage />} />
+          
+          {/* 2. Register the Duplicate Prevention Route (US 1.4) */}
+          <Route path="/already-voted" element={<AlreadyVoted />} />
+          
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
