@@ -24,6 +24,7 @@ encodings/
 
 # OS / Editor
 .DS_Store
+.vscode/
 
 # Scripts (optional)
 fix_env.sh

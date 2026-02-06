@@ -78,6 +78,9 @@ export default function Login() {
   /* =======================
      STEP 2: OTP VERIFY
      ======================= */
+  /* =======================
+   STEP 2: OTP VERIFY
+   ======================= */
   const handleOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -93,20 +96,29 @@ export default function Login() {
         },
       );
 
-      if (response.data.success) {
+      // EPIC 2 CHANGE: Store the JWT token for backend authentication
+      if (response.data.success && response.data.token) {
+        // Save the "Passport" (JWT) to local storage
+        localStorage.setItem("voterToken", response.data.token);
+
+        // Optional: Save the hashed ID if you need it for the dashboard
+        localStorage.setItem("voterIdHash", userIdHash || "");
+
         toast({
           title: "Login Successful",
-          description: "Welcome to the voting portal",
+          description: "Your secure session is now active.",
         });
+
         navigate("/dashboard/voter");
       } else {
-        throw new Error("Invalid OTP");
+        throw new Error(response.data.message || "Invalid OTP");
       }
-    } catch {
+    } catch (err: any) {
       toast({
         variant: "destructive",
-        title: "OTP Invalid",
-        description: "Please check the OTP and try again",
+        title: "Authentication Failed",
+        description:
+          err.response?.data?.message || "Please check the OTP and try again",
       });
     } finally {
       setIsLoading(false);
