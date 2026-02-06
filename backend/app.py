@@ -9,6 +9,7 @@ import easyocr
 import hashlib
 import traceback
 import time
+import jwt
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -23,6 +24,7 @@ CORS(app)
 
 DB_PATH = "voting_system.db"
 OTP_EXPIRY_SECONDS = 120   # 2 minutes
+JWT_SECRET = os.getenv("JWT_SECRET", "your_shared_secret")
 
 # =======================
 # DATABASE & UTILITIES
@@ -296,7 +298,7 @@ def verify_otp():
     entered_otp = str(data.get("otp"))
 
     if not uid_hash or not entered_otp:
-        return jsonify({"success": False}), 400
+        return jsonify({"success": False, "message": "Missing data"}), 400
 
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
@@ -308,32 +310,46 @@ def verify_otp():
 
     if not row:
         conn.close()
-        return jsonify({"success": False}), 401
+        return jsonify({"success": False, "message": "User not found"}), 401
 
     stored_otp, otp_time = row
 
+    # --- FIX START: Check if otp_time exists before doing math ---
+    if otp_time is None or stored_otp is None:
+        conn.close()
+        return jsonify({"success": False, "message": "No active OTP session found. Please login again."}), 401
+    # --- FIX END ---
+
+    # 1. Check Expiry (Now safe because otp_time is guaranteed to be a number)
     if time.time() - otp_time > OTP_EXPIRY_SECONDS:
-        cur.execute(
-            "UPDATE users SET otp=NULL, otp_time=NULL WHERE user_id_hash=?",
-            (uid_hash,)
-        )
+        cur.execute("UPDATE users SET otp=NULL, otp_time=NULL WHERE user_id_hash=?", (uid_hash,))
         conn.commit()
         conn.close()
         return jsonify({"success": False, "message": "OTP expired"}), 401
 
+    # 2. Check Correctness
     if stored_otp != entered_otp:
         conn.close()
-        return jsonify({"success": False}), 401
+        return jsonify({"success": False, "message": "Invalid OTP"}), 401
 
-    cur.execute(
-        "UPDATE users SET otp=NULL, otp_time=NULL WHERE user_id_hash=?",
-        (uid_hash,)
-    )
+    # 3. Success logic remains the same...
+    cur.execute("UPDATE users SET otp=NULL, otp_time=NULL WHERE user_id_hash=?", (uid_hash,))
     conn.commit()
     conn.close()
+    
+    payload = {
+        "userId": uid_hash,
+        "iat": int(time.time()),
+        "exp": int(time.time()) + 600 
+    }
+    
+    token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
-    return jsonify({"success": True})
-
+    return jsonify({
+        "success": True, 
+        "token": token,
+        "message": "Identity verified successfully"
+    })
 
 # =======================
 # DOCUMENT VERIFICATION
