@@ -5,16 +5,12 @@ import { Button } from "@/components/ui/button";
 import { PageWrapper } from "@/components/PageWrapper";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { useToast } from "@/hooks/use-toast";
-import { castSecureVote } from "@/services/voteService"; // Import the secure service
+import { castSecureVote } from "@/services/voteService";
 import {
-  Shield,
   CheckCircle2,
   ArrowRight,
   Vote,
-  Lock,
-  AlertTriangle,
   FileCheck,
-  Flag,
   KeyRound,
 } from "lucide-react";
 
@@ -50,36 +46,72 @@ const candidates = [
 ];
 
 export default function VotingPage() {
+  // 1. Hooks & Params
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { electionId } = useParams<{ electionId: string }>();
 
-  // US 1.7: Kiosk Idle Timer
-  useIdleTimer(60);
-
+  // 2. State Declarations (MUST be at the top to avoid ReferenceErrors)
   const [step, setStep] = useState<"select" | "confirm" | "complete">("select");
   const [selectedCandidate, setSelectedCandidate] = useState<string | null>(
     null,
   );
-  const [votePin, setVotePin] = useState(""); // US2.3: Encryption Key
+  const [votePin, setVotePin] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [receiptData, setReceiptData] = useState({ txId: "", timestamp: "" });
 
-  // Security Check: Redirect if no JWT session exists
+  // 3. Idle Timer (1 minute)
+  useIdleTimer(60);
+
+  // 4. Security Check: Redirect if no JWT session exists
   useEffect(() => {
     const token = localStorage.getItem("voterToken");
+
+    // Fix: Only redirect if there's no token AND we aren't finished voting
     if (!token && step !== "complete") {
+      console.warn("No active session found, redirecting to login.");
       navigate("/");
     }
   }, [navigate, step]);
 
+  // 5. Submit Handler
+  // 5. Submit Handler
+  // 5. Submit Handler with "Truth Serum" Debugging
   const handleSubmitVote = async () => {
-    // 1. Basic Validation
+    if (!electionId) {
+      toast({
+        variant: "destructive",
+        title: "System Error",
+        description: "Election context is missing.",
+      });
+      return;
+    }
+
+    // Grab the token from storage immediately
+    const currentTokenInStorage = localStorage.getItem("voterToken");
+
+    // --- START TRUTH SERUM ALERT ---
+    // This will pop up a box in your browser and stop the code.
+    // If the token says "2344", we know the problem is in the Login/OTP page.
+    alert(
+      "🔍 BROWSER STATE CHECK\n\n" +
+        "1. PIN in State: " +
+        votePin +
+        "\n" +
+        "2. Token in Storage: " +
+        (currentTokenInStorage
+          ? currentTokenInStorage.substring(0, 20) + "..."
+          : "EMPTY") +
+        "\n\n" +
+        "Check if the Token above looks like a PIN or a long JWT (eyJ...)",
+    );
+    // --- END TRUTH SERUM ALERT ---
+
     if (!selectedCandidate || votePin.length < 4) {
       toast({
         variant: "destructive",
         title: "Action Required",
-        description:
-          "Please select a candidate and enter your 4-6 digit secure PIN.",
+        description: "Select a candidate and enter your secure PIN.",
       });
       return;
     }
@@ -87,36 +119,36 @@ export default function VotingPage() {
     setIsSubmitting(true);
 
     try {
-      // 2. Retrieve the JWT generated during the OTP phase
-      const token = localStorage.getItem("voterToken");
-
-      if (!token) {
-        throw new Error("Authentication token not found. Please log in again.");
+      // Use the fresh token we just grabbed
+      if (
+        !currentTokenInStorage ||
+        currentTokenInStorage.length < 20 ||
+        /^\d+$/.test(currentTokenInStorage)
+      ) {
+        throw new Error(
+          "Invalid session. Token is either missing or malformed.",
+        );
       }
 
-      // 3. Submit the vote
-      // Note: We pass selectedCandidate (ballot), votePin (encryption key), and the token (auth)
       const candidateName =
         candidates.find((c) => c.id === selectedCandidate)?.name || "";
-      const result = await castSecureVote(candidateName, votePin, token);
+
+      // Payload: (electionId, vote, encryptionKey/PIN, token)
+      const result = await castSecureVote(electionId, candidateName, votePin);
 
       if (result.success) {
-        // 4. US2.1 & US2.6: Clear identity traces immediately after success
         sessionStorage.clear();
         localStorage.removeItem("voterToken");
 
-        // 5. US2.5: Set the receipt data for the voter to save
         setReceiptData({
-          txId: result.receipt, // This is the SHA-256 hash from Node.js
+          txId: result.receipt,
           timestamp: new Date().toLocaleString(),
         });
 
-        // 6. Transition to the success screen
         setStep("complete");
-
         toast({
           title: "Vote Cast Successfully",
-          description: "Your encrypted ballot has been recorded and hashed.",
+          description: "Your encrypted ballot has been recorded.",
         });
       } else {
         throw new Error(
@@ -125,26 +157,23 @@ export default function VotingPage() {
       }
     } catch (error: any) {
       console.error("Voting Error:", error);
-
       toast({
         variant: "destructive",
         title: "Voting Failed",
-        description:
-          error.response?.data?.message ||
-          error.message ||
-          "Could not connect to the voting service.",
+        description: error.message || "Could not connect to service.",
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // 6. Render Success Screen
   if (step === "complete") {
     return (
       <PageWrapper>
         <Layout>
           <div className="min-h-screen bg-neutral-100 flex items-center justify-center py-12 px-4">
-            <div className="bg-white max-w-lg w-full p-10 rounded-sm shadow-md border-t-4 border-green-600 text-center relative overflow-hidden">
+            <div className="bg-white max-w-lg w-full p-10 rounded-sm shadow-md border-t-4 border-green-600 text-center">
               <div className="w-24 h-24 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-6 border-4 border-green-100">
                 <CheckCircle2 className="h-12 w-12 text-green-600" />
               </div>
@@ -187,6 +216,7 @@ export default function VotingPage() {
     );
   }
 
+  // 7. Render Voting Flow
   return (
     <PageWrapper>
       <Layout>
