@@ -1,25 +1,24 @@
-// src/services/voteService.ts
+
 import axios from "axios";
 
 /**
- * US2.2, US2.3, US2.4: Securely submits an encrypted ballot to the Voting Core.
+ * Submits an encrypted ballot to the Voting Core.
+ * @param electionId - The ID of the election.
  * @param candidate - The name of the selected candidate.
- * @param pin - The 4-6 digit PIN used as an encryption key/salt.
- * @param token - The JWT received from the Python Auth service.
+ * @param pin - Used by the backend to derive the cryptographic seal for the ballot.
  */
-
 export const castSecureVote = async (
   electionId: string,
   candidate: string,
   pin: string
 ) => {
+  // Use environment variables for URLs in production
   const API_URL = "http://localhost:5002/api/votes/cast-vote";
 
-  // ✅ Always fetch the real JWT
   const token = localStorage.getItem("voterToken");
 
   if (!token) {
-    throw new Error("Authentication token missing. Please log in again.");
+    throw new Error("Session expired. Please log in again.");
   }
 
   try {
@@ -28,22 +27,24 @@ export const castSecureVote = async (
       {
         electionId,
         vote: candidate,
-        encryptionKey: pin,
+        encryptionKey: pin, // Used for salt/encryption on the server side
       },
       {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
+        timeout: 15000, // 15s timeout for blockchain/ledger confirmation
       }
     );
 
+    // Expected Response: { success: true, receipt: "0x...", message: "..." }
     return response.data;
   } catch (error: any) {
     const errorMsg =
       error.response?.data?.message ||
       error.response?.data?.details ||
-      error.message;
+      "The voting server is currently unreachable.";
 
     console.error("Service Layer Voting Error:", errorMsg);
     throw new Error(errorMsg);

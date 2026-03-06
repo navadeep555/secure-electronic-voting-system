@@ -1,39 +1,57 @@
 import axios from 'axios';
 
+// Ensure the port matches your Flask's running port (5000 or 5001)
 const API_BASE = "http://localhost:5001/api/admin";
 
+// Helper to get the token for protected admin routes
 const getAuthHeader = () => ({
-    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    headers: { 
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+    }
 });
 
 export const electionService = {
-    getElections: () => axios.get(`${API_BASE}/elections`, getAuthHeader()),
+    /**
+     * Fetch all elections for the dashboard list
+     */
+    getElections: () => axios.get(`http://localhost:5001/api/elections`, getAuthHeader()),
 
-    createElection: (data: any) => {
-        const payload = {
-            ...data,
-            start_time: Math.floor(new Date(data.startDate).getTime() / 1000),
-            end_time: Math.floor(new Date(data.endDate).getTime() / 1000),
-        };
+    /**
+     * Create a new election.
+     * Note: We pass the payload directly because the View already 
+     * formatted start_time and end_time as Unix integers.
+     */
+    createElection: (payload: any) => {
         return axios.post(`${API_BASE}/setup-election`, payload, getAuthHeader());
     },
 
-    // Add this to your electionService object
-addCandidate: (electionId: string, name: string, party: string) => {
-    return axios.post(
-        `${API_BASE}/add-candidate`, 
-        { electionId, name, party }, 
-        getAuthHeader()
-    );
-},
+    /**
+     * Add a candidate to a specific election
+     */
+    addCandidate: (electionId: string, name: string, party: string) => {
+        return axios.post(
+            `${API_BASE}/add-candidate`, 
+            { electionId, name, party }, 
+            getAuthHeader()
+        );
+    },
 
+    /**
+     * Change election status (DRAFT -> ACTIVE -> PAUSED -> CLOSED)
+     */
     updateStatus: (electionId: string, status: string) => 
         axios.patch(`${API_BASE}/election-status`, { electionId, status }, getAuthHeader()),
 
+    /**
+     * Get the final results for an election
+     */
     getTally: (electionId: string, decryptionKey: string) => 
         axios.get(`${API_BASE}/tally/${electionId}?decryptionKey=${decryptionKey}`, getAuthHeader()),
 
-    // --- ADD THIS NEW METHOD FOR US3.4 ---
+    /**
+     * Bulk register voter hashes for an election (US3.4)
+     */
     registerVotersForElection: (electionId: string, voterHashes: string[]) => 
         axios.post(`${API_BASE}/register-voters`, { electionId, voterHashes }, getAuthHeader())
 };
