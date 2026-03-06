@@ -46,11 +46,10 @@ export function Header() {
             <Link
               key={item.name}
               to={item.href}
-              className={`relative px-1 py-1 text-sm font-bold uppercase tracking-wide transition-colors ${
-                isActive(item.href)
+              className={`relative px-1 py-1 text-sm font-bold uppercase tracking-wide transition-colors ${isActive(item.href)
                   ? "text-primary-700"
                   : "text-neutral-600 hover:text-primary-700"
-              }`}
+                }`}
             >
               {item.name}
               {isActive(item.href) && (
@@ -70,7 +69,7 @@ export function Header() {
             <Button
               variant="ghost"
               size="sm"
-              className="text-neutral-500 hover:text-primary-700 flex gap-2 items-center text-[10px] uppercase font-bold tracking-tighter"
+              className="font-semibold text-neutral-700 hover:bg-neutral-100 uppercase text-xs tracking-wider gap-2"
             >
               <Lock className="h-3 w-3" />
               Admin Portal
@@ -118,11 +117,10 @@ export function Header() {
                     key={item.name}
                     to={item.href}
                     onClick={() => setIsOpen(false)}
-                    className={`px-4 py-3 text-sm font-bold uppercase tracking-wide border-l-2 transition-all ${
-                      isActive(item.href)
+                    className={`px-4 py-3 text-sm font-bold uppercase tracking-wide border-l-2 transition-all ${isActive(item.href)
                         ? "text-primary-700 border-primary-700 bg-primary-50"
                         : "text-neutral-600 border-transparent hover:bg-neutral-50"
-                    }`}
+                      }`}
                   >
                     {item.name}
                   </Link>
