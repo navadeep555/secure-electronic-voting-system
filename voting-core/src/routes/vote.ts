@@ -1,13 +1,13 @@
 import { Router, Response } from "express";
 import { openDB } from "../db";
 import { verifyVoterJWT } from "../middleware/auth";
-import * as crypto from "crypto";
+import * as cryptoUtils from "../utils/crypto";
+import crypto from "crypto";
 
 const router = Router();
 
 /**
- * US3.2: Get elections specific to the logged-in voter
- * Returns only ACTIVE elections where the user is on the guest list.
+ * US 4.1: Get elections specific to the logged-in voter
  */
 router.get("/my-elections", verifyVoterJWT, async (req: any, res: Response) => {
   const db = await openDB();
@@ -29,11 +29,11 @@ router.get("/my-elections", verifyVoterJWT, async (req: any, res: Response) => {
 });
 
 /**
- * US3.2, US3.4, US3.6: Enhanced Voting Logic
+ * US 6.1, 6.2, 5.1: High-Integrity Voting Logic
  */
 router.post("/cast-vote", verifyVoterJWT, async (req: any, res: Response) => {
   const { electionId, vote, encryptionKey } = req.body;
-  const userIdHash = req.user.userIdHash;
+  const userIdHash = req.user.userId; // Corrected from userIdHash for consistency
 
   if (!electionId || !vote || !encryptionKey) {
     return res.status(400).json({ success: false, message: "Missing election, vote, or key." });
@@ -42,7 +42,7 @@ router.post("/cast-vote", verifyVoterJWT, async (req: any, res: Response) => {
   const db = await openDB();
 
   try {
-    // 1. [US3.2 & US3.6] Check Election Status and Timeline
+    // 1. Check Election Status and Timeline (US 3.6)
     const election = await db.get(
       "SELECT status, start_time, end_time FROM elections WHERE election_id = ?",
       [electionId]
@@ -53,58 +53,47 @@ router.post("/cast-vote", verifyVoterJWT, async (req: any, res: Response) => {
     }
 
     const now = Math.floor(Date.now() / 1000);
-
-    // Block if not ACTIVE (US3.6)
-    if (election.status !== 'ACTIVE') {
-      return res.status(403).json({ success: false, message: `Election is currently ${election.status}.` });
+    if (election.status !== 'ACTIVE' || now < election.start_time || now > election.end_time) {
+      return res.status(403).json({ success: false, message: "Election is not currently active." });
     }
 
-    // Block if outside time window (US3.2)
-    if (now < election.start_time) {
-      return res.status(403).json({ success: false, message: "Election has not started yet." });
-    }
-    if (now > election.end_time) {
-      return res.status(403).json({ success: false, message: "Election has ended." });
-    }
-
-    // 2. [US3.4] Check Voter Eligibility for THIS specific election
+    // 2. Check Voter Eligibility (US 3.4)
     const voterRecord = await db.get(
       "SELECT has_voted FROM election_voters WHERE election_id = ? AND user_id_hash = ?",
       [electionId, userIdHash]
     );
 
-    if (!voterRecord) {
-      return res.status(403).json({ success: false, message: "You are not eligible for this election." });
+    if (!voterRecord || voterRecord.has_voted === 1) {
+      return res.status(403).json({ success: false, message: "Ineligible or already voted." });
     }
 
-    if (voterRecord.has_voted === 1) {
-      return res.status(403).json({ success: false, message: "Vote already cast for this election." });
-    }
-
-    // Start Transaction
+    // --- Start Transaction ---
     await db.run("BEGIN TRANSACTION");
 
-    // 3. [US2.3] Encryption Logic
-    // Using Buffer.alloc(32, encryptionKey) ensures the key is exactly 32 bytes for AES-256
-    const cipher = crypto.createCipheriv("aes-256-cbc", Buffer.alloc(32, encryptionKey), Buffer.alloc(16, 0));
-    let encryptedVote = cipher.update(vote, "utf8", "hex");
-    encryptedVote += cipher.final("hex");
+    // 3. Encrypt and Hash (US 2.3 & 2.4)
+    const encryptedVote = cryptoUtils.encryptVote(vote, encryptionKey);
+    const voteHash = cryptoUtils.hashData(encryptedVote);
+    const voteId = crypto.randomUUID();
+    const timestamp = Date.now();
+    const receiptHash = cryptoUtils.generateReceipt(voteId, userIdHash);
 
-    const voteHash = crypto.createHash("sha256").update(encryptedVote).digest("hex");
-    
-    // US2.5: Receipt Hash (Anonymized but verifiable proof of vote)
-    const receiptHash = crypto.createHash("sha256")
-      .update(userIdHash + electionId + Date.now().toString())
-      .digest("hex");
-
-    // 4. Save to 'votes' table
-    await db.run(
-      `INSERT INTO votes (id, encrypted_vote, vote_hash, timestamp, receipt_hash, election_id) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [crypto.randomUUID(), encryptedVote, voteHash, Date.now(), receiptHash, electionId]
+    // 4. US 6.2: Generate Integrity Signature (The "Seal")
+    // This makes the database row immutable and verifiable.
+    const integritySignature = cryptoUtils.generateIntegritySignature(
+        voteId, 
+        electionId, 
+        encryptedVote, 
+        timestamp
     );
 
-    // 5. [US3.4] Mark as voted in THIS election only
+    // 5. Save to 'votes' table with the Signature
+    await db.run(
+      `INSERT INTO votes (vote_id, election_id, encrypted_vote, vote_hash, timestamp, receipt_hash, integrity_signature) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [voteId, electionId, encryptedVote, voteHash, timestamp, receiptHash, integritySignature]
+    );
+
+    // 6. Mark as voted (US 3.4)
     await db.run(
       "UPDATE election_voters SET has_voted = 1 WHERE election_id = ? AND user_id_hash = ?",
       [electionId, userIdHash]
@@ -115,13 +104,13 @@ router.post("/cast-vote", verifyVoterJWT, async (req: any, res: Response) => {
     res.json({
       success: true,
       receipt: receiptHash,
-      message: "Your anonymous encrypted vote has been cast."
+      message: "Your anonymous encrypted vote has been cast and sealed."
     });
 
   } catch (error: any) {
     if (db) await db.run("ROLLBACK");
     console.error("❌ Voting Error:", error.message);
-    res.status(500).json({ success: false, message: "Database error during voting." });
+    res.status(500).json({ success: false, message: "Security error or Database failure." });
   }
 });
 
