@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import {
   Plus,
-  Calendar,
   Clock,
   MoreVertical,
   Play,
@@ -10,7 +9,6 @@ import {
   Trash2,
   Users,
   Search,
-  Filter,
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,14 +32,27 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { electionService } from "@/services/electionService";
 
+// --- 1. Define the Interface to match your app.py Schema ---
+interface Election {
+  election_id: string;
+  title: string;
+  description: string;
+  start_time: number;
+  end_time: number;
+  status: "DRAFT" | "ACTIVE" | "PAUSED" | "CLOSED";
+  candidate_count?: number;
+}
+
 export function AdminElectionsView() {
-  const [elections, setElections] = useState([]);
+  const [elections, setElections] = useState<Election[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  // US3.3: Candidate Management States
+  // Candidate Management States
   const [isManageOpen, setIsManageOpen] = useState(false);
-  const [selectedElection, setSelectedElection] = useState<any>(null);
+  const [selectedElection, setSelectedElection] = useState<Election | null>(
+    null,
+  );
   const [candidateForm, setCandidateForm] = useState({ name: "", party: "" });
   const [isAddingCandidate, setIsAddingCandidate] = useState(false);
 
@@ -49,7 +60,6 @@ export function AdminElectionsView() {
 
   const [newElection, setNewElection] = useState({
     title: "",
-    type: "Federal",
     startDate: "",
     endDate: "",
     description: "",
@@ -67,7 +77,7 @@ export function AdminElectionsView() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to load elections",
+        description: "Failed to load elections from the server.",
         variant: "destructive",
       });
     } finally {
@@ -77,6 +87,7 @@ export function AdminElectionsView() {
 
   const handleCreateElection = async () => {
     try {
+      // 1. Basic Validation
       if (
         !newElection.title ||
         !newElection.startDate ||
@@ -85,55 +96,81 @@ export function AdminElectionsView() {
         toast({ title: "Required", description: "Please fill in all fields" });
         return;
       }
-      await electionService.createElection({
+
+      // 2. Convert "2026-02-21" string to Unix Integer
+      const startUnix = Math.floor(
+        new Date(newElection.startDate).getTime() / 1000,
+      );
+      const endUnix = Math.floor(
+        new Date(newElection.endDate).getTime() / 1000,
+      );
+
+      // 3. Prevent sending 'None' to Flask
+      if (isNaN(startUnix) || isNaN(endUnix)) {
+        toast({
+          title: "Invalid Dates",
+          description: "Please re-select the dates using the calendar.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // 4. Construct the exact payload expected by the backend
+      const payload = {
         title: newElection.title,
         description: newElection.description || "No description provided",
-        startDate: newElection.startDate,
-        endDate: newElection.endDate,
+        start_time: startUnix,
+        end_time: endUnix,
         candidates: [],
-      });
-      toast({ title: "Success", description: "Election created successfully" });
+      };
+
+      console.log("🚀 Payload being sent to Flask:", payload);
+
+      await electionService.createElection(payload);
+
+      toast({ title: "Success", description: "Election initialized!" });
       setIsCreateOpen(false);
       setNewElection({
         title: "",
-        type: "Federal",
         startDate: "",
         endDate: "",
         description: "",
       });
       fetchElections();
     } catch (error: any) {
-      toast({ title: "Creation Failed", variant: "destructive" });
+      console.error("API Error:", error);
+      toast({
+        title: "Creation Failed",
+        description: "Check terminal logs.",
+        variant: "destructive",
+      });
     }
   };
 
-  // US3.6: Handle Status Toggle with "Point of No Return" Warning
   const handleStatusChange = async (id: string, currentStatus: string) => {
     let nextStatus = currentStatus === "ACTIVE" ? "PAUSED" : "ACTIVE";
 
-    // US3.6: Intercept Draft -> Active transition
     if (currentStatus === "DRAFT") {
       const confirmed = window.confirm(
-        "Warning: Once activated, the candidate list will be cryptographically locked and cannot be edited. Are you sure you want to proceed?",
+        "Warning: Once activated, the candidate list will be cryptographically locked. Proceed?",
       );
       if (!confirmed) return;
     }
 
     try {
       await electionService.updateStatus(id, nextStatus);
-      toast({ title: `Election is now ${nextStatus}` });
+      toast({ title: `Election status updated to ${nextStatus}` });
       fetchElections();
     } catch (error) {
       toast({ title: "Update Failed", variant: "destructive" });
     }
   };
 
-  // US3.3: Add Candidate logic
   const handleAddCandidate = async () => {
-    if (!candidateForm.name || !candidateForm.party) return;
+    if (!candidateForm.name || !candidateForm.party || !selectedElection)
+      return;
     setIsAddingCandidate(true);
     try {
-      // Ensure you added addCandidate to electionService.ts as discussed
       await electionService.addCandidate(
         selectedElection.election_id,
         candidateForm.name,
@@ -141,10 +178,10 @@ export function AdminElectionsView() {
       );
       toast({
         title: "Candidate Added",
-        description: `${candidateForm.name} is now on the ballot.`,
+        description: `${candidateForm.name} is on the ballot.`,
       });
       setCandidateForm({ name: "", party: "" });
-      fetchElections(); // Refresh counts
+      fetchElections();
     } catch (error) {
       toast({
         title: "Error",
@@ -161,18 +198,32 @@ export function AdminElectionsView() {
     return new Date(unix * 1000).toISOString().split("T")[0];
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusDisplay = (status: string, endTime: number) => {
+    const now = Math.floor(Date.now() / 1000);
+    if (now > endTime && status !== "DRAFT")
+      return {
+        label: "CLOSED",
+        color: "bg-neutral-100 text-neutral-800 border-neutral-200",
+      };
+
     switch (status.toUpperCase()) {
       case "ACTIVE":
-        return "bg-green-100 text-green-800 border-green-200";
+        return {
+          label: "ACTIVE",
+          color: "bg-green-100 text-green-800 border-green-200",
+        };
       case "DRAFT":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      case "CLOSED":
-        return "bg-neutral-100 text-neutral-800 border-neutral-200";
+        return {
+          label: "DRAFT",
+          color: "bg-blue-100 text-blue-800 border-blue-200",
+        };
       case "PAUSED":
-        return "bg-orange-100 text-orange-800 border-orange-200";
+        return {
+          label: "PAUSED",
+          color: "bg-orange-100 text-orange-800 border-orange-200",
+        };
       default:
-        return "bg-neutral-100 text-neutral-800";
+        return { label: status, color: "bg-neutral-100 text-neutral-800" };
     }
   };
 
@@ -187,32 +238,31 @@ export function AdminElectionsView() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between gap-4">
-        <div className="flex gap-2 flex-1">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
-            <Input
-              placeholder="Search elections..."
-              className="pl-10 bg-white"
-            />
-          </div>
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
+          <Input placeholder="Search elections..." className="pl-10 bg-white" />
         </div>
         <Button
           onClick={() => setIsCreateOpen(true)}
-          className="bg-primary-700 hover:bg-primary-800 text-white"
+          className="bg-[#800020] hover:bg-[#600015] text-white"
         >
           <Plus className="h-4 w-4 mr-2" /> Create Election
         </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        {elections.map((election: any) => {
+        {elections.map((election) => {
           const sDate = formatDate(election.start_time);
           const eDate = formatDate(election.end_time);
+          const statusInfo = getStatusDisplay(
+            election.status,
+            election.end_time,
+          );
 
           return (
             <div
               key={election.election_id}
-              className="group bg-white rounded-sm border border-neutral-200 p-5 shadow-sm hover:border-primary-300 transition-all flex flex-col md:flex-row gap-6 items-start md:items-center"
+              className="bg-white rounded-sm border border-neutral-200 p-5 shadow-sm hover:border-red-200 transition-all flex flex-col md:flex-row gap-6 items-center"
             >
               <div className="flex-shrink-0 flex flex-col items-center justify-center w-16 h-16 bg-neutral-50 rounded-sm border border-neutral-200 font-mono">
                 <span className="text-xs font-bold text-neutral-400 uppercase">
@@ -227,9 +277,9 @@ export function AdminElectionsView() {
                 <div className="flex items-center gap-2 mb-1">
                   <Badge
                     variant="outline"
-                    className={`${getStatusColor(election.status)} rounded-sm px-2 py-0.5 border uppercase text-[10px]`}
+                    className={`${statusInfo.color} rounded-sm px-2 py-0.5 border uppercase text-[10px]`}
                   >
-                    {election.status}
+                    {statusInfo.label}
                   </Badge>
                   <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">
                     ID: {election.election_id.substring(0, 8)}...
@@ -249,8 +299,7 @@ export function AdminElectionsView() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 self-end md:self-center">
-                {/* US3.3 Button Trigger */}
+              <div className="flex items-center gap-2">
                 <Button
                   variant="secondary"
                   size="sm"
@@ -271,36 +320,23 @@ export function AdminElectionsView() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem disabled={election.status !== "DRAFT"}>
-                      <FileEdit className="h-4 w-4 mr-2" /> Edit Details
+                      <FileEdit className="h-4 w-4 mr-2" /> Edit
                     </DropdownMenuItem>
-
-                    {election.status === "ACTIVE" ? (
-                      <DropdownMenuItem
-                        onClick={() =>
-                          handleStatusChange(election.election_id, "ACTIVE")
-                        }
-                        className="text-orange-600 font-medium"
-                      >
-                        <Pause className="h-4 w-4 mr-2" /> Pause Election
-                      </DropdownMenuItem>
-                    ) : (
-                      <DropdownMenuItem
-                        onClick={() =>
-                          handleStatusChange(
-                            election.election_id,
-                            election.status,
-                          )
-                        }
-                        className="text-green-600 font-medium"
-                        disabled={election.status === "CLOSED"}
-                      >
-                        <Play className="h-4 w-4 mr-2" />{" "}
-                        {election.status === "DRAFT"
-                          ? "Activate Election"
-                          : "Resume Election"}
-                      </DropdownMenuItem>
-                    )}
-
+                    <DropdownMenuItem
+                      onClick={() =>
+                        handleStatusChange(
+                          election.election_id,
+                          election.status,
+                        )
+                      }
+                    >
+                      {election.status === "ACTIVE" ? (
+                        <Pause className="h-4 w-4 mr-2" />
+                      ) : (
+                        <Play className="h-4 w-4 mr-2" />
+                      )}
+                      {election.status === "ACTIVE" ? "Pause" : "Activate"}
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-red-600"
                       disabled={election.status === "ACTIVE"}
@@ -316,38 +352,31 @@ export function AdminElectionsView() {
       </div>
 
       {/* --- MODALS --- */}
-
-      {/* US3.3: Manage Candidates Modal */}
       <Dialog open={isManageOpen} onOpenChange={setIsManageOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Manage Candidates</DialogTitle>
             <DialogDescription>
-              Add candidates to <strong>{selectedElection?.title}</strong>.
-              Note: Candidates cannot be added after the election is activated.
+              Add candidates to the secure ballot.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="c-name">Candidate Full Name</Label>
+              <Label>Full Name</Label>
               <Input
-                id="c-name"
                 value={candidateForm.name}
                 onChange={(e) =>
                   setCandidateForm({ ...candidateForm, name: e.target.value })
                 }
-                placeholder="e.g. John Doe"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="c-party">Party Affiliation</Label>
+              <Label>Party Affiliation</Label>
               <Input
-                id="c-party"
                 value={candidateForm.party}
                 onChange={(e) =>
                   setCandidateForm({ ...candidateForm, party: e.target.value })
                 }
-                placeholder="e.g. Independent"
               />
             </div>
           </div>
@@ -356,24 +385,21 @@ export function AdminElectionsView() {
               Close
             </Button>
             <Button
-              className="bg-primary-700 text-white"
+              className="bg-[#800020] text-white"
               onClick={handleAddCandidate}
-              disabled={
-                isAddingCandidate || !candidateForm.name || !candidateForm.party
-              }
+              disabled={isAddingCandidate}
             >
               {isAddingCandidate ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="animate-spin h-4 w-4" />
               ) : (
-                <Plus className="mr-2 h-4 w-4" />
-              )}
+                <Plus className="h-4 w-4 mr-2" />
+              )}{" "}
               Add to Ballot
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* US3.1: Create Election Modal */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
@@ -381,33 +407,18 @@ export function AdminElectionsView() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="title">Election Title</Label>
+              <Label>Title</Label>
               <Input
-                id="title"
                 value={newElection.title}
                 onChange={(e) =>
                   setNewElection({ ...newElection, title: e.target.value })
                 }
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="desc">Description</Label>
-              <Input
-                id="desc"
-                value={newElection.description}
-                onChange={(e) =>
-                  setNewElection({
-                    ...newElection,
-                    description: e.target.value,
-                  })
-                }
-              />
-            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="start">Start Date</Label>
+                <Label>Start Date</Label>
                 <Input
-                  id="start"
                   type="date"
                   value={newElection.startDate}
                   onChange={(e) =>
@@ -419,9 +430,8 @@ export function AdminElectionsView() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="end">End Date</Label>
+                <Label>End Date</Label>
                 <Input
-                  id="end"
                   type="date"
                   value={newElection.endDate}
                   onChange={(e) =>
@@ -437,7 +447,7 @@ export function AdminElectionsView() {
             </Button>
             <Button
               onClick={handleCreateElection}
-              className="bg-primary-700 text-white"
+              className="bg-[#800020] text-white"
             >
               Initialize Election
             </Button>
