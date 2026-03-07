@@ -30,7 +30,7 @@ def voter_required(f):
                 return jsonify(success=False, message="Unauthorized"), 403
             
             # Attach to request for use in routes
-            request.user = decoded 
+            request.voter = decoded 
             return f(*args, **kwargs)
             
         except jwt.ExpiredSignatureError:

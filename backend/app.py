@@ -295,32 +295,30 @@ class FaceRecognitionSystem:
 
     def base64_to_image(self, b64):
         try:
-            # 1. Handle Data URI prefix
             if "," in b64:
                 b64 = b64.split(",")[1]
-            
-            # 2. Fix potential character corruption
             b64 = b64.replace(" ", "+").strip()
-
-            # 3. Fix padding
             missing_padding = len(b64) % 4
             if missing_padding:
                 b64 += '=' * (4 - missing_padding)
 
             img_data = base64.b64decode(b64)
-            return Image.open(BytesIO(img_data)).convert("RGB")
+            # CRITICAL FIX: Explicitly convert to RGB to remove Alpha channels
+            return Image.open(BytesIO(img_data)).convert("RGB") 
         except Exception as e:
             print(f"❌ Critical Decoding Failure: {e}")
             return None
 
     def decode(self, b64):
-        # We wrap this in a try/except to catch the ValueError from above
         try:
             img = self.base64_to_image(b64)
+            if img is None: return None
+            # Return as numpy array for face_recognition library
             return np.array(img)
-        except:
+        except Exception as e:
+            print(f"Decode error: {e}")
             return None
-
+        
     def encode(self, img_array):
         if img_array is None: return None
         locs = face_recognition.face_locations(img_array)
@@ -494,7 +492,7 @@ def cast_vote():
     eid = data.get("election_id")
     cid = data.get("candidate_id")
     salt_pin = data.get("pin") 
-    voter_id = request.user["userId"] # Hashed ID from middleware
+    voter_id = request.voter.get["userId"] # Hashed ID from middleware
 
     conn = get_db()
     now = int(time.time())
