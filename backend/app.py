@@ -81,13 +81,28 @@ CORS(
 )
 
 # PostgreSQL connection settings (from environment)
-DB_CONFIG = {
-    "host": os.getenv("DB_HOST", "postgres"),
-    "port": int(os.getenv("DB_PORT", 5432)),
-    "user": os.getenv("DB_USER", "voting"),
-    "password": os.getenv("DB_PASSWORD", "voting123"),
-    "dbname": os.getenv("DB_NAME", "votingdb"),
-}
+# On Render, DATABASE_URL is automatically injected.
+# Locally, individual DB_* variables are used (see docker-compose.yml).
+_DATABASE_URL = os.getenv("DATABASE_URL")
+if _DATABASE_URL:
+    import urllib.parse as _urlparse
+    _parsed = _urlparse.urlparse(_DATABASE_URL)
+    DB_CONFIG = {
+        "host": _parsed.hostname,
+        "port": _parsed.port or 5432,
+        "user": _parsed.username,
+        "password": _parsed.password,
+        "dbname": _parsed.path.lstrip("/"),
+        "sslmode": "require",   # Required for Render managed PostgreSQL
+    }
+else:
+    DB_CONFIG = {
+        "host": os.getenv("DB_HOST", "postgres"),
+        "port": int(os.getenv("DB_PORT", 5432)),
+        "user": os.getenv("DB_USER", "voting"),
+        "password": os.getenv("DB_PASSWORD", "voting123"),
+        "dbname": os.getenv("DB_NAME", "votingdb"),
+    }
 
 OTP_EXPIRY_SECONDS = 120
 DB_INTEGRITY_KEY = os.environ.get('DB_INTEGRITY_KEY', 'change_this_in_production_key').encode()

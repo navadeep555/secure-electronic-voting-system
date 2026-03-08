@@ -2,16 +2,26 @@ import pkg from "pg";
 const { Pool } = pkg;
 
 // ── PostgreSQL connection pool ────────────────────────────────
-export const pool = new Pool({
-  host: process.env.DB_HOST || "localhost",
-  user: process.env.DB_USER || "voting",
-  password: process.env.DB_PASSWORD || "voting123",
-  database: process.env.DB_NAME || "votingdb",
-  port: Number(process.env.DB_PORT) || 5432,
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-});
+// On Render, DATABASE_URL is automatically injected.
+// Locally, individual DB_* env vars (from docker-compose) are used.
+export const pool = process.env.DATABASE_URL
+  ? new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }, // Required for Render managed PostgreSQL
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+  })
+  : new Pool({
+    host: process.env.DB_HOST || "localhost",
+    user: process.env.DB_USER || "voting",
+    password: process.env.DB_PASSWORD || "voting123",
+    database: process.env.DB_NAME || "votingdb",
+    port: Number(process.env.DB_PORT) || 5432,
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+  });
 
 pool.on("error", (err: Error) => {
   console.error("❌ Unexpected PostgreSQL pool error:", err.message);
