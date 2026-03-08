@@ -12,7 +12,7 @@ services:
     name: flask-backend
     runtime: python
     rootDir: backend
-    buildCommand: pip install --no-cache-dir -r requirements.txt
+    buildCommand: apt-get install -y tesseract-ocr tesseract-ocr-eng && pip install --no-cache-dir -r requirements.txt
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
     plan: free
     branch: main

@@ -352,28 +352,11 @@ def perform_live_audit(eid):
 # FACE RECOGNITION ENGINE  (FIXED)
 # =======================
 
-# Lazy loaded when first needed
-_reader = None
-def get_ocr_reader():
-    global _reader
-    if _reader is None:
-        import easyocr
-        print("Lazy-loading EasyOCR reader into memory...")
-        _reader = easyocr.Reader(["en"], gpu=False)
-    return _reader
-
-
 def _prewarm_models():
-    """Pre-warm heavy ML models in background so first user request is fast."""
-    import threading, time
+    """Pre-warm the FaceRecognitionSystem in background so first user request is fast."""
+    import threading
     def _load():
         time.sleep(5)  # Wait for server to fully boot first
-        try:
-            print("[PREWARM] Loading EasyOCR in background...")
-            get_ocr_reader()
-            print("[PREWARM] EasyOCR ready.")
-        except Exception as e:
-            print(f"[PREWARM] EasyOCR failed: {e}")
         try:
             print("[PREWARM] Loading FaceRecognitionSystem in background...")
             get_face_system()
@@ -540,50 +523,59 @@ def index():
 @app.route("/api/verify-document", methods=["POST"])
 def verify_document():
     """
-    US1.2: Document verification — lightweight PIL-only check.
-    EasyOCR/PyTorch are NOT used here; they exceed Render free-tier memory (~512 MB)
-    and cause 502 Bad Gateway. Instead we validate the image itself:
-      1. Must be decodable as a real image.
-      2. Must be at least 100×100 px (real ID cards always are).
-      3. Must not be a blank/solid-colour image (std-dev of pixels > threshold).
-    Any legitimate government ID photo will pass all three checks.
+    US1.2: Identity Verification using Tesseract OCR (pytesseract).
+    Uses the system tesseract-ocr binary — no PyTorch / no EasyOCR.
+    Checks extracted text for keywords present on Indian government IDs
+    (Voter ID / EPIC and Aadhaar card).
     """
     try:
+        import pytesseract
+
         img_b64 = request.json.get("documentImage")
         if not img_b64:
             return jsonify(success=False, message="No image provided"), 400
 
-        # ── Step 1: decode ────────────────────────────────────────────────────
+        # ── Decode ────────────────────────────────────────────────────────────
         try:
             b64_data = img_b64.split(",")[1] if "," in img_b64 else img_b64
             img_data = base64.b64decode(b64_data.replace(" ", "+"))
             pil_img = Image.open(BytesIO(img_data)).convert("RGB")
+            # Tesseract works best at ~300 DPI equivalent; 1200px is plenty
+            if pil_img.width > 1200 or pil_img.height > 1200:
+                pil_img.thumbnail((1200, 1200), Image.LANCZOS)
         except Exception as decode_err:
             print(f"[verify-document] Decode error: {decode_err}")
             return jsonify(success=False, message="Invalid image data. Please upload a valid JPEG or PNG."), 400
 
-        w, h = pil_img.size
-        print(f"[verify-document] Image size: {w}x{h}")
+        # ── Run OCR ───────────────────────────────────────────────────────────
+        try:
+            # psm 6 = assume a single uniform block of text (good for ID cards)
+            text = pytesseract.image_to_string(
+                pil_img,
+                lang="eng",
+                config="--psm 6"
+            ).upper()
+            print(f"[verify-document] OCR text: {text[:300]}")
+        except Exception as ocr_err:
+            print(f"[verify-document] OCR error: {ocr_err}")
+            return jsonify(success=False, message="OCR failed. Please try again with a clearer image."), 500
 
-        # ── Step 2: minimum resolution ────────────────────────────────────────
-        MIN_DIM = 100  # px  — a 100×100 image is barely a thumbnail, not a document
-        if w < MIN_DIM or h < MIN_DIM:
-            return jsonify(success=False, message="Image is too small. Please upload a clear photo of your document."), 400
+        # ── Keyword match ─────────────────────────────────────────────────────
+        # Voter ID (EPIC): ELECTION COMMISSION OF INDIA, ELECTORAL, IDENTITY CARD
+        # Aadhaar: AADHAAR, UIDAI, UNIQUE IDENTIFICATION, GOVERNMENT OF INDIA
+        VALID_KEYWORDS = [
+            "ELECTION", "ELECTORAL", "IDENTITY",
+            "AADHAAR", "UIDAI", "UNIQUE IDENTIFICATION",
+            "GOVERNMENT OF INDIA", "INDIA",
+            "VOTER", "EPIC",
+        ]
+        matched = [kw for kw in VALID_KEYWORDS if kw in text]
+        print(f"[verify-document] Keywords matched: {matched}")
 
-        # ── Step 3: not a blank / solid-colour image ──────────────────────────
-        # Downsample first so std calculation is fast
-        thumb = pil_img.copy()
-        thumb.thumbnail((200, 200), Image.LANCZOS)
-        img_arr = np.array(thumb, dtype=np.float32)
-        pixel_std = float(img_arr.std())
-        print(f"[verify-document] Pixel std-dev: {pixel_std:.2f}")
+        if matched:
+            return jsonify({"success": True, "message": "Document verified"})
 
-        if pixel_std < 8.0:   # solid-colour / blank image
-            return jsonify(success=False, message="Document image appears blank. Please upload a clear, well-lit photo."), 400
-
-        # ── All checks passed ─────────────────────────────────────────────────
-        print("[verify-document] Document accepted.")
-        return jsonify({"success": True, "message": "Document verified"})
+        return jsonify({"success": False, "message": "Could not verify document. Please upload a clear photo of your Voter ID or Aadhaar card."}), 400
 
     except Exception as e:
         print(f"[verify-document] Unexpected error: {e}")
