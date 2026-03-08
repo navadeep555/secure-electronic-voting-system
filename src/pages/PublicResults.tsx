@@ -33,7 +33,7 @@ const PublicResults = () => {
   useEffect(() => {
     // We fetch from the same observer endpoint, but the backend 
     // logic should now return a 403 or a specific status if results_published is 0
-    fetch(`http://127.0.0.1:5001/api/observer/results/${eid}`)
+    fetch(`/api/observer/results/${eid}`)
       .then((res) => {
         if (res.status === 404) throw new Error("Not Found");
         return res.json();
@@ -48,7 +48,7 @@ const PublicResults = () => {
       const token = localStorage.getItem("token");
 
       const response = await axios.get(
-        `http://127.0.0.1:5001/api/admin/election/${eid}/report`,
+        `/api/admin/election/${eid}/report`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -84,7 +84,7 @@ const PublicResults = () => {
 
       doc.setFontSize(10);
       doc.text(`Audit Status: ${reportData.audit_verification.integrity_check}`, 14, finalY + 7);
-      
+
       const isAuditSuccess = reportData.audit_verification.integrity_check === "SUCCESS";
       doc.setDrawColor(isAuditSuccess ? 0 : 200, isAuditSuccess ? 128 : 0, 0);
       doc.rect(14, finalY + 12, 182, 20);
