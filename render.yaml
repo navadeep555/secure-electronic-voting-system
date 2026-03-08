@@ -10,9 +10,9 @@ services:
   # ─────────────────────────────────────────────
   - type: web
     name: flask-backend
-    runtime: python
-    rootDir: backend
-    buildCommand: apt-get install -y tesseract-ocr tesseract-ocr-eng && pip install --no-cache-dir -r requirements.txt
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
     plan: free
     branch: main
