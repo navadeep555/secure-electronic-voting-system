@@ -493,6 +493,16 @@ def get_face_system():
     return _face_system
 
 
+@app.route("/")
+def index():
+    """Root endpoint to show server status."""
+    return jsonify(
+        status="healthy",
+        message="Secure Electronic Voting System - Backend is Live!",
+        version="1.0.1"
+    )
+
+
 # =======================
 # USER & AUTH ROUTES (EPIC 1)
 # =======================
