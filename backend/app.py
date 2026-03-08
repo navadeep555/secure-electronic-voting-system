@@ -66,19 +66,27 @@ limiter = Limiter(
 JWT_SECRET = os.getenv("JWT_SECRET", "your_shared_secret")
 app.config['SECRET_KEY'] = JWT_SECRET
 jwt_manager = JWTManager(app)
+# Configure CORS - Combine defaults with environment variables
+allowed_origins = [
+    "http://localhost",
+    "http://localhost:80",
+    "http://localhost:8080",
+    "http://localhost:8081",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1",
+    "http://127.0.0.1:8080",
+    "http://127.0.0.1:8081",
+]
+
+env_origins = os.getenv("ALLOWED_ORIGINS")
+if env_origins:
+    # Handle comma-separated list of origins
+    allowed_origins.extend([o.strip() for o in env_origins.split(",")])
+
 CORS(
     app,
-    resources={r"/api/*": {"origins": [
-        "http://localhost",
-        "http://localhost:80",
-        "http://localhost:8080",
-        "http://localhost:8081",
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1",
-        "http://127.0.0.1:8080",
-        "http://127.0.0.1:8081",
-    ]}},
+    resources={r"/api/*": {"origins": allowed_origins}},
     supports_credentials=True,
     allow_headers=["Content-Type", "Authorization"],
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
