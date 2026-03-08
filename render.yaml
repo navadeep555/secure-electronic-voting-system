@@ -41,7 +41,7 @@ services:
     name: voting-core
     runtime: node
     rootDir: voting-core
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --include=dev && npm run build
     startCommand: node dist/server.js
     plan: free
     branch: main
