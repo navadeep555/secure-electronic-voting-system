@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE = "http://localhost:5001/api/voter";
+const API_BASE = "/api/voter";
 
 const getAuthHeader = () => ({
   headers: {

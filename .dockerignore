@@ -1,0 +1,41 @@
+# Root-level .dockerignore
+# Excludes files that no Docker build ever needs.
+# NOTE: Each Dockerfile only COPYs its own directory (backend/, voting-core/, src/).
+#       Frontend files are kept in context so src/Dockerfile can access them.
+
+# Version control
+.git/
+.gitignore
+
+# Docs & UML (no build needs these)
+*.docx
+UML_Diagrams/
+
+# Compiled / generated output
+node_modules/
+dist/
+__pycache__/
+*.pyc
+*.pyo
+
+# Test artifacts
+tests/
+test-reports/
+test1.py
+app1.py
+TESTING_STRATEGY.md
+DevOpsStrategy.md
+
+# Secrets & local config (use .env passed via docker compose env_file)
+.env
+.env.*
+
+# SQLite databases (use Docker named volumes instead)
+*.db
+*.sqlite3
+
+# Windows-only wheel (not needed in Linux containers)
+*.whl
+
+# CI/CD workflows
+.github/

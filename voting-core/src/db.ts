@@ -1,62 +1,140 @@
-import sqlite3 from "sqlite3";
-import { open } from "sqlite";
-import path from "path";
+import pkg from "pg";
+const { Pool } = pkg;
 
-const DB_FILE_PATH = path.join(__dirname, "..", "..", "backend", "voting_system.db");
+// ── PostgreSQL connection pool ────────────────────────────────
+export const pool = new Pool({
+  host: process.env.DB_HOST || "localhost",
+  user: process.env.DB_USER || "voting",
+  password: process.env.DB_PASSWORD || "voting123",
+  database: process.env.DB_NAME || "votingdb",
+  port: Number(process.env.DB_PORT) || 5432,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+});
 
-export const openDB = async () => {
-  const db = await open({
-    filename: DB_FILE_PATH,
-    driver: sqlite3.Database,
-  });
+pool.on("error", (err: Error) => {
+  console.error("❌ Unexpected PostgreSQL pool error:", err.message);
+});
 
-  // Enable Foreign Key support
-  await db.get("PRAGMA foreign_keys = ON");
-  
-  return db;
-};
+// ── Database initialisation ───────────────────────────────────
+export const initDB = async (): Promise<void> => {
 
-export const initDB = async () => {
-  const db = await openDB();
+  // Retry loop – waits for Postgres container to be ready
+  for (let attempt = 1; attempt <= 10; attempt++) {
+    try {
+      await pool.query("SELECT 1");
+      console.log("✅ PostgreSQL connection established.");
+      break;
+    } catch (err: any) {
+      console.log(`⏳ Waiting for PostgreSQL... attempt ${attempt}/10`);
+      if (attempt === 10) throw err;
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
 
-  // Note: Standardized column names to match the Python app.py
-  await db.run(`
-    CREATE TABLE IF NOT EXISTS votes (
-      vote_id TEXT PRIMARY KEY,
-      election_id TEXT,
-      candidate_id TEXT, 
-      timestamp INTEGER,
-      previous_hash TEXT,
-      block_hash TEXT,
-      integrity_signature TEXT
-    )
-  `);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
 
-  //  Create Audit Log table to track unauthorized modifications
-  await db.run(`
-    CREATE TABLE IF NOT EXISTS audit_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      action TEXT,
-      table_name TEXT,
-      row_id TEXT,
-      old_value TEXT,
-      new_value TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
+    // ── votes table ───────────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS votes (
+        vote_id             TEXT PRIMARY KEY,
+        election_id         TEXT,
+        candidate_id        TEXT,
+        encrypted_vote      TEXT,
+        vote_hash           TEXT,
+        timestamp           BIGINT,
+        previous_hash       TEXT,
+        block_hash          TEXT,
+        receipt_hash        TEXT,
+        integrity_signature TEXT
+      )
+    `);
 
-  // TAMPER TRAP TRIGGER
-  // This trigger blocks any UPDATE attempt and logs it to the audit table.
-  await db.run(`
-    CREATE TRIGGER IF NOT EXISTS trap_vote_tampering
-    BEFORE UPDATE ON votes
-    BEGIN
-      INSERT INTO audit_log (action, table_name, row_id, old_value, new_value)
-      VALUES ('UNAUTHORIZED_UPDATE_ATTEMPT', 'votes', OLD.vote_id, OLD.candidate_id, NEW.candidate_id);
-      SELECT RAISE(ABORT, 'Security Error: Ballots are immutable and cannot be changed.');
-    END;
-  `);
+    // ── audit_log table ───────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS audit_log (
+        id         SERIAL PRIMARY KEY,
+        action     TEXT,
+        table_name TEXT,
+        row_id     TEXT,
+        old_value  TEXT,
+        new_value  TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
-  console.log("✅ Voting-core connected to shared DB with Audit Triggers at:", DB_FILE_PATH);
-  return db;
+    // ── elections table ───────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS elections (
+        election_id       TEXT PRIMARY KEY,
+        title             TEXT,
+        description       TEXT,
+        start_time        BIGINT,
+        end_time          BIGINT,
+        status            TEXT CHECK(status IN ('DRAFT','ACTIVE','PAUSED','CLOSED')),
+        created_by        TEXT,
+        created_at        BIGINT,
+        results_published INTEGER DEFAULT 0
+      )
+    `);
+
+    // ── candidates table ──────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS candidates (
+        candidate_id TEXT PRIMARY KEY,
+        election_id  TEXT REFERENCES elections(election_id),
+        name         TEXT,
+        party        TEXT
+      )
+    `);
+
+    // ── election_voters table ─────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS election_voters (
+        election_id  TEXT,
+        user_id_hash TEXT,
+        has_voted    INTEGER DEFAULT 0,
+        PRIMARY KEY (election_id, user_id_hash)
+      )
+    `);
+
+    // ── Tamper-trap trigger function ──────────────────────────
+    await client.query(`
+      CREATE OR REPLACE FUNCTION trap_vote_tampering_fn()
+      RETURNS TRIGGER LANGUAGE plpgsql AS $$
+      BEGIN
+        INSERT INTO audit_log (action, table_name, row_id, old_value, new_value)
+        VALUES (
+          'UNAUTHORIZED_UPDATE_ATTEMPT', 'votes',
+          OLD.vote_id, OLD.encrypted_vote, NEW.encrypted_vote
+        );
+        RAISE EXCEPTION 'Security Error: Ballots are immutable and cannot be changed.';
+      END;
+      $$
+    `);
+
+    // Create trigger only if it does not already exist
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_trigger WHERE tgname = 'trap_vote_tampering'
+        ) THEN
+          CREATE TRIGGER trap_vote_tampering
+          BEFORE UPDATE ON votes
+          FOR EACH ROW EXECUTE FUNCTION trap_vote_tampering_fn();
+        END IF;
+      END $$
+    `);
+
+    await client.query("COMMIT");
+    console.log("✅ PostgreSQL schema ready with tamper-trap trigger.");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 };

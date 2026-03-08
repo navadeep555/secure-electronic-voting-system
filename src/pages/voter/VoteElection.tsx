@@ -13,7 +13,7 @@ interface Candidate {
   party: string;
 }
 
-const API_BASE = "http://localhost:5001/api/voter";
+const API_BASE = "/api/voter";
 
 export default function VoteElection() {
   const { electionId } = useParams<{ electionId: string }>();
@@ -71,7 +71,7 @@ export default function VoteElection() {
     try {
       // ✅ FIX: Match the exact keys the Python backend expects
       await axios.post(
-        "http://localhost:5001/api/voter/cast-vote",
+        "/api/voter/cast-vote",
         {
           election_id: electionId, // Backend expects election_id
           candidate_id: selectedCandidateId, // Backend expects candidate_id
@@ -135,11 +135,10 @@ export default function VoteElection() {
                 candidates.map((c) => (
                   <label
                     key={c.candidate_id}
-                    className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                      selectedCandidateId === c.candidate_id
+                    className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedCandidateId === c.candidate_id
                         ? "border-primary-600 bg-primary-50 shadow-sm"
                         : "border-neutral-200 hover:border-neutral-300 bg-white"
-                    }`}
+                      }`}
                   >
                     <input
                       type="radio"

@@ -1,13 +1,16 @@
 
 
-const FACE_API_URL = "http://localhost:5001/api";
+// Use relative URL so requests are proxied through Nginx in Docker.
+// For local dev (npm run dev), ensure Flask is running on :5000 and
+// add a Vite proxy for /api → http://localhost:5000 in vite.config.ts.
+const FACE_API_URL = "/api";
 
 export interface FaceRecognitionResult {
   success: boolean;
   message: string;
   userIdHash?: string;
   debug_otp?: string;
-  otp?:string;
+  otp?: string;
 }
 
 export interface RegistrationResult {
@@ -56,15 +59,15 @@ export async function registerUserFaces(
  */
 
 export async function recognizeUserFace(
-  userId: string, 
+  userId: string,
   faceImage: string, // base64 image
   tolerance: number = 0.6
 ): Promise<FaceRecognitionResult> {
   console.log("➡️ Sending recognize-face payload", {
-  userId,
-  faceImagePresent: !!faceImage,
-  faceImageLength: faceImage?.length,
-});
+    userId,
+    faceImagePresent: !!faceImage,
+    faceImageLength: faceImage?.length,
+  });
 
   try {
     const response = await fetch(`${FACE_API_URL}/recognize-face`, {

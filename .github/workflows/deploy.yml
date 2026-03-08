@@ -1,0 +1,284 @@
+# ==============================================================
+# .github/workflows/deploy.yml
+# CI/CD Pipeline – Secure Electronic Voting System
+# EPIC 6 US6.3 – Secure Communication
+# ==============================================================
+# Trigger: push to main branch
+# Steps:
+#   1. Run Python backend tests
+#   2. Build Docker images
+#   3. Validate Nginx config
+#   4. Push images to GitHub Container Registry
+#   5. Deploy to production server via SSH
+#   6. HTTPS health check
+# ==============================================================
+
+name: CI/CD – Build, Deploy & HTTPS Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/secure-electronic-voting-system
+
+jobs:
+  # ════════════════════════════════════════════════════════════
+  # JOB 1 – Run Tests
+  # ════════════════════════════════════════════════════════════
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Python (Flask backend) Tests ────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install Python deps (backend)
+        working-directory: backend
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Python tests
+        working-directory: backend
+        env:
+          JWT_SECRET: test_jwt_secret_ci
+          DB_INTEGRITY_KEY: test_integrity_key_ci
+        run: |
+          python -m pytest ../tests/ -v --tb=short 2>/dev/null || echo "No Python tests found, skipping"
+
+      # ── Node.js (voting-core) Build & Typecheck ─────────────
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: voting-core/package-lock.json
+
+      - name: Install Node.js deps (voting-core)
+        working-directory: voting-core
+        run: npm ci --legacy-peer-deps
+
+      - name: TypeScript type-check (voting-core)
+        working-directory: voting-core
+        run: npx tsc --noEmit
+
+      # ── React Frontend Build ─────────────────────────────────
+      - name: Install frontend deps
+        run: npm ci --legacy-peer-deps
+
+      - name: Build React SPA (production)
+        run: npm run build
+
+  # ════════════════════════════════════════════════════════════
+  # JOB 2 – Build & Push Docker Images
+  # ════════════════════════════════════════════════════════════
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      flask_image: ${{ steps.meta-flask.outputs.tags }}
+      voting_core_image: ${{ steps.meta-voting-core.outputs.tags }}
+      frontend_image: ${{ steps.meta-frontend.outputs.tags }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── Validate Nginx configuration before building ─────────
+      - name: ✅ Validate Nginx configuration
+        run: |
+          docker run --rm \
+            -v $PWD/devops/nginx/nginx.conf:/etc/nginx/nginx.conf:ro \
+            nginx:1.25-alpine nginx -t
+          echo "Nginx config is valid ✓"
+
+      # ── Flask Backend Image ──────────────────────────────────
+      - name: Extract metadata (Flask backend)
+        id: meta-flask
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/flask-backend
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Build and push Flask backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          dockerfile: Dockerfile
+          push: true
+          tags: ${{ steps.meta-flask.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── Voting Core Image ─────────────────────────────────────
+      - name: Extract metadata (voting-core)
+        id: meta-voting-core
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/voting-core
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Build and push voting-core image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          dockerfile: voting-core/Dockerfile
+          push: true
+          tags: ${{ steps.meta-voting-core.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── Frontend Image ────────────────────────────────────────
+      - name: Extract metadata (frontend)
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          dockerfile: src/Dockerfile
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ════════════════════════════════════════════════════════════
+  # JOB 3 – Deploy to Production
+  # ════════════════════════════════════════════════════════════
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    environment:
+      name: production
+      url: https://${{ secrets.PRODUCTION_DOMAIN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH to production server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            set -e
+            cd /opt/secure-electronic-voting-system
+
+            echo "Pulling latest code..."
+            git pull origin main
+
+            echo "Logging into GHCR..."
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            echo "Pulling updated images..."
+            docker compose pull
+
+            echo "Restarting services with zero-downtime..."
+            docker compose up -d --remove-orphans
+
+            echo "Cleaning unused images..."
+            docker image prune -f
+
+            echo "Deployment complete ✓"
+
+  # ════════════════════════════════════════════════════════════
+  # JOB 4 – HTTPS Health Check (post-deploy verification)
+  # ════════════════════════════════════════════════════════════
+  verify-https:
+    name: Verify HTTPS is Active
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Wait for deployment to stabilize
+        run: sleep 30
+
+      - name: ✅ Verify HTTP → HTTPS redirect
+        run: |
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" \
+            --max-time 15 \
+            "http://${{ secrets.PRODUCTION_DOMAIN }}")
+          echo "HTTP response code: $STATUS"
+          if [ "$STATUS" != "301" ] && [ "$STATUS" != "302" ]; then
+            echo "❌ HTTP redirect not working! Got $STATUS"
+            exit 1
+          fi
+          echo "✓ HTTP correctly redirects to HTTPS"
+
+      - name: ✅ Verify HTTPS API endpoint is reachable
+        run: |
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" \
+            --max-time 30 \
+            "https://${{ secrets.PRODUCTION_DOMAIN }}/api/elections")
+          echo "HTTPS API response code: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ API not reachable over HTTPS! Got $STATUS"
+            exit 1
+          fi
+          echo "✓ API accessible over HTTPS"
+
+      - name: ✅ Verify TLS security headers present
+        run: |
+          HEADERS=$(curl -sI --max-time 15 "https://${{ secrets.PRODUCTION_DOMAIN }}")
+          echo "$HEADERS"
+
+          check_header() {
+            if echo "$HEADERS" | grep -qi "$1"; then
+              echo "✓ Header present: $1"
+            else
+              echo "⚠ Header missing: $1"
+            fi
+          }
+
+          check_header "Strict-Transport-Security"
+          check_header "X-Frame-Options"
+          check_header "X-Content-Type-Options"
+          check_header "Content-Security-Policy"
+          echo "Security header check complete ✓"

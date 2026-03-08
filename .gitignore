@@ -17,6 +17,8 @@ __pycache__/
 venv/
 env/
 .venv/
+*.whl
+*.log
 
 # Project specific (biometric data)
 face_data/
@@ -28,3 +30,12 @@ encodings/
 
 # Scripts (optional)
 fix_env.sh
+
+# SSL Certificates - NEVER commit private keys
+devops/ssl/certs/*.key
+devops/ssl/certs/*.csr
+devops/ssl/certs/ca.*
+
+# Temporary / scratch files
+app1.py
+test1.py
