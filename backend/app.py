@@ -363,6 +363,28 @@ def get_ocr_reader():
     return _reader
 
 
+def _prewarm_models():
+    """Pre-warm heavy ML models in background so first user request is fast."""
+    import threading, time
+    def _load():
+        time.sleep(5)  # Wait for server to fully boot first
+        try:
+            print("[PREWARM] Loading EasyOCR in background...")
+            get_ocr_reader()
+            print("[PREWARM] EasyOCR ready.")
+        except Exception as e:
+            print(f"[PREWARM] EasyOCR failed: {e}")
+        try:
+            print("[PREWARM] Loading FaceRecognitionSystem in background...")
+            get_face_system()
+            print("[PREWARM] FaceRecognitionSystem ready.")
+        except Exception as e:
+            print(f"[PREWARM] FaceRecognitionSystem failed: {e}")
+        print("[PREWARM] All models warm and ready!")
+
+    t = threading.Thread(target=_load, daemon=True)
+    t.start()
+
 import cv2
 
 class FaceRecognitionSystem:
@@ -519,23 +541,41 @@ def index():
 def verify_document():
     """US1.2: Identity Verification using OCR."""
     try:
-        face_system = get_face_system()
         img_b64 = request.json.get("documentImage")
-        img_np = face_system.decode(img_b64)
-        if img_np is None:
+        if not img_b64:
+            return jsonify(success=False, message="No image provided"), 400
+
+        # Lightweight decode — no need to load the heavy face recognition system
+        try:
+            b64_data = img_b64.split(",")[1] if "," in img_b64 else img_b64
+            img_data = base64.b64decode(b64_data.replace(" ", "+"))
+            pil_img = Image.open(BytesIO(img_data)).convert("RGB")
+            # Downscale for OCR speed (EasyOCR works well at ≤1000px)
+            if pil_img.width > 1000 or pil_img.height > 1000:
+                pil_img.thumbnail((1000, 1000), Image.LANCZOS)
+            img_np = np.array(pil_img, dtype=np.uint8)
+        except Exception as decode_err:
+            print(f"[verify-document] Decode error: {decode_err}")
             return jsonify(success=False, message="Invalid image data"), 400
-        
+
         reader = get_ocr_reader()
         ocr_result = reader.readtext(img_np)
         text = " ".join([t[1] for t in ocr_result]).upper()
+        print(f"[verify-document] OCR text snippet: {text[:200]}")
 
-        if "ELECTION" in text or "INDIA" in text or "IDENTITY" in text:
+        # Keywords for Voter ID (EPIC) and Aadhaar card
+        VALID_KEYWORDS = {
+            "ELECTION", "IDENTITY", "INDIA", "VOTER",
+            "AADHAAR", "UIDAI", "UNIQUE IDENTIFICATION",
+            "GOVERNMENT", "ELECTORAL",
+        }
+        if any(kw in text for kw in VALID_KEYWORDS):
             return jsonify({"success": True, "message": "Document verified"})
 
-        return jsonify({"success": False, "message": "Invalid Document"}), 400
+        return jsonify({"success": False, "message": "Could not verify document. Ensure it is a valid Voter ID or Aadhaar card."}), 400
     except Exception as e:
-        print(f"Error: {e}")
-        return jsonify({"success": False, "message": "Verification Failed"}), 500
+        print(f"[verify-document] Error: {e}")
+        return jsonify({"success": False, "message": "Verification failed. Please try again."}), 500
 
 
 @app.route("/api/debug-face", methods=["POST"])
