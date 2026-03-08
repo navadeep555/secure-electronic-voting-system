@@ -11,7 +11,7 @@ const AdminLogin = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await axios.post("http://localhost:5001/api/admin/login", {
+      const res = await axios.post("/api/admin/login", {
         username,
         password,
       });

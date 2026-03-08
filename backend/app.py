@@ -1,11 +1,23 @@
 import os
 import base64
 import numpy as np
-import face_recognition
 from flask_jwt_extended import JWTManager, create_access_token
 import pickle
 import random
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+# --- Monkeypatch for easyocr + python-bidi >= 0.5.0 ---
+import sys
+try:
+    import bidi.algorithm
+    import bidi
+    if not hasattr(bidi, 'get_display'):
+        bidi.get_display = bidi.algorithm.get_display
+        sys.modules['bidi'].get_display = bidi.algorithm.get_display
+except ImportError:
+    pass
+
 import easyocr
 import hashlib
 import time
@@ -24,6 +36,9 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from auth import voter_required, roles_required
 from functools import wraps
+from flask_talisman import Talisman
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 # =======================
 # APP SETUP
@@ -32,18 +47,47 @@ from functools import wraps
 load_dotenv()
 
 app = Flask(__name__)
+
+# Apply security headers (CSP handled by Nginx, disable force_https as Nginx proxies it)
+Talisman(app, force_https=False, content_security_policy=None)
+
+# Apply rate limiting
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+
 JWT_SECRET = os.getenv("JWT_SECRET", "your_shared_secret")
 app.config['SECRET_KEY'] = JWT_SECRET
 jwt_manager = JWTManager(app)
 CORS(
     app,
-    resources={r"/api/*": {"origins": "http://localhost:8080"}},
+    resources={r"/api/*": {"origins": [
+        "http://localhost",
+        "http://localhost:80",
+        "http://localhost:8080",
+        "http://localhost:8081",
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1",
+        "http://127.0.0.1:8080",
+        "http://127.0.0.1:8081",
+    ]}},
     supports_credentials=True,
     allow_headers=["Content-Type", "Authorization"],
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 )
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "voting_system.db")
+
+# PostgreSQL connection settings (from environment)
+DB_CONFIG = {
+    "host": os.getenv("DB_HOST", "postgres"),
+    "port": int(os.getenv("DB_PORT", 5432)),
+    "user": os.getenv("DB_USER", "voting"),
+    "password": os.getenv("DB_PASSWORD", "voting123"),
+    "dbname": os.getenv("DB_NAME", "votingdb"),
+}
 
 OTP_EXPIRY_SECONDS = 120
 DB_INTEGRITY_KEY = os.environ.get('DB_INTEGRITY_KEY', 'change_this_in_production_key').encode()
@@ -58,6 +102,10 @@ def handle_preflight():
         res.headers.add("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
         return res
 
+@app.route("/api/health", methods=["GET"])
+def health_check():
+    """Simple health check endpoint."""
+    return jsonify(status="ok", service="flask-backend"), 200
 
 def token_required(f):
     @wraps(f)
@@ -80,10 +128,10 @@ def auto_close_expired_elections():
     if request.path.startswith('/api/admin') or request.path.startswith('/api/voter'):
         conn = get_db()
         now = int(time.time())
-        cursor = conn.execute("""
+        cursor = db_execute(conn, """
             UPDATE elections 
             SET status = 'CLOSED' 
-            WHERE status = 'ACTIVE' AND end_time <= ?
+            WHERE status = 'ACTIVE' AND end_time <= %s
         """, (now,))
         if cursor.rowcount > 0:
             conn.commit()
@@ -96,9 +144,17 @@ def auto_close_expired_elections():
 # =======================
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    """Return a psycopg2 connection with RealDictCursor (rows act like dicts)."""
+    conn = psycopg2.connect(**DB_CONFIG)
+    conn.autocommit = False
     return conn
+
+
+def db_execute(conn, sql, params=None):
+    """Helper: execute SQL, return cursor. Keeps callers concise."""
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute(sql, params or ())
+    return cur
 
 
 def compute_hash(data_string):
@@ -120,7 +176,7 @@ def init_db():
             phone_hash TEXT,
             role TEXT CHECK(role IN ('admin','voter')) NOT NULL,
             otp TEXT,
-            otp_time INTEGER,
+            otp_time BIGINT,
             is_verified INTEGER DEFAULT 0
         )
     """)
@@ -130,11 +186,11 @@ def init_db():
             election_id TEXT PRIMARY KEY,
             title TEXT,
             description TEXT,
-            start_time INTEGER,
-            end_time INTEGER,
+            start_time BIGINT,
+            end_time BIGINT,
             status TEXT CHECK(status IN ('DRAFT','ACTIVE', 'PAUSED', 'CLOSED')),
             created_by TEXT,
-            created_at INTEGER,
+            created_at BIGINT,
             results_published INTEGER DEFAULT 0
         )
     """)
@@ -161,8 +217,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS votes (
             vote_id TEXT PRIMARY KEY,
             election_id TEXT,
-            candidate_id TEXT, 
-            timestamp INTEGER,
+            candidate_id TEXT,
+            timestamp BIGINT,
             previous_hash TEXT,
             block_hash TEXT,
             integrity_signature TEXT
@@ -171,33 +227,46 @@ def init_db():
 
     c.execute("""
         CREATE TABLE IF NOT EXISTS audit_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             action TEXT,
             table_name TEXT,
             row_id TEXT,
             old_value TEXT,
             new_value TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT NOW()
         )
     """)
 
+    # PostgreSQL trigger to prevent vote tampering
     c.execute("""
-        CREATE TRIGGER IF NOT EXISTS trap_vote_tampering
-        BEFORE UPDATE ON votes
+        CREATE OR REPLACE FUNCTION trap_vote_tampering_fn()
+        RETURNS TRIGGER LANGUAGE plpgsql AS $$
         BEGIN
             INSERT INTO audit_log (action, table_name, row_id, old_value, new_value)
             VALUES ('UNAUTHORIZED_UPDATE_ATTEMPT', 'votes', OLD.vote_id, OLD.candidate_id, NEW.candidate_id);
-            SELECT RAISE(ABORT, 'Security Error: Ballots are immutable and cannot be changed.');
+            RAISE EXCEPTION 'Security Error: Ballots are immutable and cannot be changed.';
         END;
+        $$;
+    """)
+    c.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'trap_vote_tampering'
+            ) THEN
+                CREATE TRIGGER trap_vote_tampering
+                BEFORE UPDATE ON votes
+                FOR EACH ROW EXECUTE FUNCTION trap_vote_tampering_fn();
+            END IF;
+        END $$;
     """)
 
     c.execute("""
         CREATE TABLE IF NOT EXISTS system_logs (
-            log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            log_id SERIAL PRIMARY KEY,
             event_type TEXT,
             details TEXT,
             admin_id TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            timestamp TIMESTAMP DEFAULT NOW()
         )
     """)
 
@@ -212,15 +281,15 @@ init_db()
 def perform_live_audit(eid):
     conn = get_db()
 
-    candidates = conn.execute(
-        "SELECT candidate_id, name FROM candidates WHERE election_id = ?", (eid,)
-    ).fetchall()
+    cur = db_execute(conn, "SELECT candidate_id, name FROM candidates WHERE election_id = %s", (eid,))
+    candidates = cur.fetchall()
     results_map = {c['candidate_id']: {"name": c['name'], "count": 0} for c in candidates}
 
-    ballots = conn.execute(
-        "SELECT vote_id, election_id, candidate_id, timestamp, block_hash, integrity_signature FROM votes WHERE election_id = ?",
+    cur = db_execute(conn, 
+        "SELECT vote_id, election_id, candidate_id, timestamp, block_hash, integrity_signature FROM votes WHERE election_id = %s",
         (eid,)
-    ).fetchall()
+    )
+    ballots = cur.fetchall()
 
     total_votes = len(ballots)
     tampered_found = False
@@ -242,8 +311,8 @@ def perform_live_audit(eid):
 
     final_results = [{"candidate_name": data["name"], "votes": data["count"]} for data in results_map.values()]
 
-    conn.execute(
-        "INSERT INTO system_logs (event_type, details) VALUES (?, ?)",
+    db_execute(conn,
+        "INSERT INTO system_logs (event_type, details) VALUES (%s, %s)",
         ('AUDIT_PERFORMED', f"Audit for {eid}. Votes: {total_votes}. Tampered: {tampered_found}")
     )
     conn.commit()
@@ -446,11 +515,19 @@ def debug_face():
 
 
 @app.route("/api/register-face", methods=["POST"])
+@limiter.limit("5 per minute")
 def register_face():
     try:
         data = request.get_json()
-        uid = data.get("userId")
-        phone = data.get("phoneNumber")
+        raw_uid = data.get("userId")
+        raw_phone = data.get("phoneNumber")
+        
+        if not raw_uid or not raw_phone:
+            return jsonify(success=False, message="Missing ID or Phone"), 400
+            
+        uid = compute_hash(str(raw_uid))
+        phone = compute_hash(str(raw_phone))
+        
         images = data.get("faceImages", [])
         if data.get("faceImage"):
             images.insert(0, data.get("faceImage"))
@@ -476,8 +553,13 @@ def register_face():
             face_system.save()
 
             conn = get_db()
-            conn.execute(
-                "INSERT OR REPLACE INTO users (user_id_hash, phone_hash, role, is_verified) VALUES (?, ?, ?, ?)",
+            db_execute(conn,
+                """
+                INSERT INTO users (user_id_hash, phone_hash, role, is_verified)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (user_id_hash) DO UPDATE
+                SET phone_hash = EXCLUDED.phone_hash, is_verified = EXCLUDED.is_verified
+                """,
                 (str(uid), str(phone), 'voter', 1)
             )
             conn.commit()
@@ -492,13 +574,16 @@ def register_face():
 
 
 @app.route("/api/recognize-face", methods=["POST"])
+@limiter.limit("5 per minute")
 def recognize_face():
     data = request.json
-    uid = data.get("userId")
+    raw_uid = data.get("userId")
     img_b64 = data.get("faceImage")
 
-    if not uid or not img_b64:
+    if not raw_uid or not img_b64:
         return jsonify(success=False, message="Missing ID or Image"), 400
+
+    uid = compute_hash(str(raw_uid))
 
     if uid not in face_system.known:
         return jsonify(success=False, message="User not registered"), 401
@@ -519,29 +604,47 @@ def recognize_face():
 
     otp = str(random.randint(100000, 999999))
     conn = get_db()
-    conn.execute("UPDATE users SET otp=?, otp_time=? WHERE user_id_hash=?", (otp, int(time.time()), uid))
+    db_execute(conn, "UPDATE users SET otp=%s, otp_time=%s WHERE user_id_hash=%s", (otp, int(time.time()), uid))
     conn.commit()
     conn.close()
 
-    print(f"[OK] Recognition Success for {uid}. OTP: {otp}")
-    return jsonify(success=True, userIdHash=uid)
+    if app.debug:
+        # Prominent display for local developers
+        print("\n" + "="*40)
+        print(f"🔥 [LOCAL DEBUG OTP] 🔥")
+        print(f"USER: {uid}")
+        print(f"OTP:  {otp}")
+        print("="*40 + "\n", flush=True)
+    else:
+        # Standard logging for production/Docker
+        print(f"[OK] Recognition Success for {uid}. OTP: {otp}", flush=True)
+
+    response_data = {"success": True, "userIdHash": uid}
+    if app.debug:
+        response_data["debug_otp"] = otp
+    return jsonify(response_data)
 
 
 @app.route("/api/verify-otp", methods=["POST"])
+@limiter.limit("5 per minute")
 def verify_otp():
     data = request.json
     uid, otp = data["userIdHash"], str(data["otp"])
     conn = get_db()
-    row = conn.execute("SELECT otp, otp_time, role FROM users WHERE user_id_hash=?", (uid,)).fetchone()
+    cur = db_execute(conn, "SELECT otp, otp_time, role FROM users WHERE user_id_hash=%s", (uid,))
+    row = cur.fetchone()
 
-    if not row or row['otp'] != otp or (time.time() - row['otp_time'] > OTP_EXPIRY_SECONDS):
+    if not row or row['otp'] != otp or (time.time() - int(row['otp_time']) > OTP_EXPIRY_SECONDS):
+        conn.close()
         return jsonify(success=False, message="Invalid/Expired OTP"), 401
 
     token = pyjwt.encode({
         "userId": uid, "role": row['role'], "exp": int(time.time()) + 3600
     }, JWT_SECRET, algorithm="HS256")
 
-    return jsonify(success=True, token=token, role=row['role'])
+    role = row['role']
+    conn.close()
+    return jsonify(success=True, token=token, role=role)
 
 
 # =======================
@@ -553,19 +656,20 @@ def get_all_elections():
     conn = get_db()
     now = int(time.time())
 
-    conn.execute("""
+    db_execute(conn, """
         UPDATE elections 
         SET status = 'CLOSED' 
-        WHERE status = 'ACTIVE' AND end_time < ?
+        WHERE status = 'ACTIVE' AND end_time < %s
     """, (now,))
     conn.commit()
 
-    rows = conn.execute("""
+    cur = db_execute(conn, """
         SELECT e.*, 
         (SELECT COUNT(*) FROM candidates c WHERE c.election_id = e.election_id) as candidate_count 
         FROM elections e
         ORDER BY created_at DESC
-    """).fetchall()
+    """)
+    rows = cur.fetchall()
     conn.close()
 
     data = []
@@ -598,10 +702,11 @@ def cast_vote():
     now = int(time.time())
 
     try:
-        election = conn.execute(
-            "SELECT status, start_time, end_time FROM elections WHERE election_id = ?",
+        cur = db_execute(conn,
+            "SELECT status, start_time, end_time FROM elections WHERE election_id = %s",
             (eid,)
-        ).fetchone()
+        )
+        election = cur.fetchone()
 
         if not election:
             return jsonify(success=False, message="Election not found"), 404
@@ -617,15 +722,17 @@ def cast_vote():
         if is_manually_disabled:
             return jsonify(success=False, message="Election is currently disabled"), 403
 
-        voter_check = conn.execute(
-            "SELECT has_voted FROM election_voters WHERE election_id=? AND user_id_hash=?",
+        cur = db_execute(conn,
+            "SELECT has_voted FROM election_voters WHERE election_id=%s AND user_id_hash=%s",
             (eid, voter_id)
-        ).fetchone()
+        )
+        voter_check = cur.fetchone()
 
         if voter_check and voter_check['has_voted']:
             return jsonify(success=False, message="Already voted"), 403
 
-        last_v = conn.execute("SELECT block_hash FROM votes ORDER BY timestamp DESC LIMIT 1").fetchone()
+        cur = db_execute(conn, "SELECT block_hash FROM votes ORDER BY timestamp DESC LIMIT 1")
+        last_v = cur.fetchone()
         prev_h = last_v['block_hash'] if last_v else "0"
 
         vid = str(uuid.uuid4())
@@ -635,16 +742,16 @@ def cast_vote():
         seal_payload = f"{vid}|{eid}|{cid}|{ts}|{curr_h}"
         integrity_sig = hmac.new(DB_INTEGRITY_KEY, seal_payload.encode(), hashlib.sha256).hexdigest()
 
-        conn.execute("""
+        db_execute(conn, """
             INSERT INTO votes (
                 vote_id, election_id, candidate_id, timestamp, 
                 previous_hash, block_hash, integrity_signature
             ) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """, (vid, eid, cid, ts, prev_h, curr_h, integrity_sig))
 
-        conn.execute(
-            "UPDATE election_voters SET has_voted = 1 WHERE election_id=? AND user_id_hash=?",
+        db_execute(conn,
+            "UPDATE election_voters SET has_voted = 1 WHERE election_id=%s AND user_id_hash=%s",
             (eid, voter_id)
         )
 
@@ -679,18 +786,20 @@ def admin_elections_handler():
     if request.method == "POST":
         data = request.json
         eid = str(uuid.uuid4())
-        conn.execute("INSERT INTO elections VALUES (?, ?, ?, ?, ?, 'ACTIVE', 'admin', ?)",
-                     (eid, data["title"], data["description"], data["start_time"], data["end_time"], int(time.time())))
+        db_execute(conn,
+            "INSERT INTO elections (election_id, title, description, start_time, end_time, status, created_by, created_at) VALUES (%s, %s, %s, %s, %s, 'ACTIVE', 'admin', %s)",
+            (eid, data["title"], data["description"], data["start_time"], data["end_time"], int(time.time())))
         conn.commit()
         conn.close()
         return jsonify(success=True)
 
-    rows = conn.execute("""
+    cur = db_execute(conn, """
         SELECT e.*, 
         (SELECT COUNT(*) FROM candidates c WHERE c.election_id = e.election_id) as candidate_count 
         FROM elections e
         ORDER BY created_at DESC
-    """).fetchall()
+    """)
+    rows = cur.fetchall()
     conn.close()
 
     data = []
@@ -727,11 +836,11 @@ def admin_setup_election():
         created_by = "admin_user"
 
         conn = get_db()
-        conn.execute("""
+        db_execute(conn, """
             INSERT INTO elections (
                 election_id, title, description, start_time, end_time, 
                 status, created_by, created_at
-            ) VALUES (?, ?, ?, ?, ?, 'DRAFT', ?, ?)
+            ) VALUES (%s, %s, %s, %s, %s, 'DRAFT', %s, %s)
         """, (eid, title, description, int(start_ts), int(end_ts), created_by, created_at))
 
         conn.commit()
@@ -769,8 +878,9 @@ def toggle_election(eid):
     """US3.6: Emergency pause/close control."""
     status = request.json.get("status")
     conn = get_db()
-    conn.execute("UPDATE elections SET status=? WHERE election_id=?", (status, eid))
+    db_execute(conn, "UPDATE elections SET status=%s WHERE election_id=%s", (status, eid))
     conn.commit()
+    conn.close()
     return jsonify(success=True)
 
 
@@ -787,21 +897,25 @@ def update_election_status():
         conn = get_db()
 
         if next_status == "ACTIVE":
-            count_row = conn.execute(
-                "SELECT COUNT(*) FROM candidates WHERE election_id = ?", (election_id,)
-            ).fetchone()
-            if count_row[0] < 2:
+            cur = db_execute(conn,
+                "SELECT COUNT(*) as cnt FROM candidates WHERE election_id = %s", (election_id,)
+            )
+            count_row = cur.fetchone()
+            if count_row['cnt'] < 2:
+                conn.close()
                 return jsonify(success=False, message="Add at least 2 candidates before starting."), 400
 
-        cursor = conn.execute(
-            "UPDATE elections SET status = ? WHERE election_id = ?",
+        cur = db_execute(conn,
+            "UPDATE elections SET status = %s WHERE election_id = %s",
             (next_status, election_id)
         )
         conn.commit()
 
-        if cursor.rowcount == 0:
+        if cur.rowcount == 0:
+            conn.close()
             return jsonify(success=False, message="Election not found"), 404
 
+        conn.close()
         return jsonify(success=True, message=f"Election is now {next_status}")
     except Exception as e:
         return jsonify(success=False, message=str(e)), 500
@@ -819,8 +933,8 @@ def add_candidate():
     try:
         conn = get_db()
         cid = str(uuid.uuid4())
-        conn.execute(
-            "INSERT INTO candidates (candidate_id, election_id, name, party) VALUES (?, ?, ?, ?)",
+        db_execute(conn,
+            "INSERT INTO candidates (candidate_id, election_id, name, party) VALUES (%s, %s, %s, %s)",
             (cid, eid, name, party)
         )
         conn.commit()
@@ -846,9 +960,10 @@ def register_voters():
     try:
         conn = get_db()
         for v_hash in voter_hashes:
-            conn.execute("""
-                INSERT OR IGNORE INTO election_voters (election_id, user_id_hash, has_voted) 
-                VALUES (?, ?, 0)
+            db_execute(conn, """
+                INSERT INTO election_voters (election_id, user_id_hash, has_voted) 
+                VALUES (%s, %s, 0)
+                ON CONFLICT (election_id, user_id_hash) DO NOTHING
             """, (eid, v_hash))
         conn.commit()
         return jsonify(success=True, message=f"Authorized {len(voter_hashes)} voters.")
@@ -867,11 +982,12 @@ def get_users():
 
     try:
         conn = get_db()
-        rows = conn.execute("""
+        cur = db_execute(conn, """
             SELECT user_id_hash, phone_hash, role, is_verified 
             FROM users 
             WHERE role = 'voter'
-        """).fetchall()
+        """)
+        rows = cur.fetchall()
         conn.close()
         return jsonify([dict(row) for row in rows])
     except Exception as e:
@@ -882,10 +998,11 @@ def get_users():
 @app.route("/api/voter/elections/<eid>/candidates", methods=["GET"])
 def get_election_candidates(eid):
     conn = get_db()
-    rows = conn.execute(
-        "SELECT candidate_id, name, party FROM candidates WHERE election_id = ?",
+    cur = db_execute(conn,
+        "SELECT candidate_id, name, party FROM candidates WHERE election_id = %s",
         (eid,)
-    ).fetchall()
+    )
+    rows = cur.fetchall()
     conn.close()
     return jsonify([dict(row) for row in rows])
 
@@ -902,10 +1019,11 @@ def get_voter_available_elections():
                    e.start_time, e.end_time 
             FROM elections e
             JOIN election_voters ev ON e.election_id = ev.election_id
-            WHERE ev.user_id_hash = ? AND ev.has_voted = 0
+            WHERE ev.user_id_hash = %s AND ev.has_voted = 0
         """
 
-        elections = conn.execute(query, (voter_id,)).fetchall()
+        cur = db_execute(conn, query, (voter_id,))
+        elections = cur.fetchall()
         conn.close()
 
         return jsonify([dict(row) for row in elections]), 200
@@ -924,10 +1042,11 @@ def get_public_results(eid):
     """US 4.1 & 4.5: Public Results with Publication Control and Integrity Verification."""
     conn = get_db()
     try:
-        election = conn.execute(
-            "SELECT status, results_published FROM elections WHERE election_id = ?",
+        cur = db_execute(conn,
+            "SELECT status, results_published FROM elections WHERE election_id = %s",
             (eid,)
-        ).fetchone()
+        )
+        election = cur.fetchone()
 
         if not election:
             return jsonify(success=False, message="Election not found."), 404
@@ -939,8 +1058,10 @@ def get_public_results(eid):
                 "message": "Results are currently hidden. Waiting for Admin to certify and publish."
             }), 403
 
-        votes = conn.execute("SELECT * FROM votes WHERE election_id = ?", (eid,)).fetchall()
-        candidates = conn.execute("SELECT candidate_id, name FROM candidates WHERE election_id = ?", (eid,)).fetchall()
+        cur = db_execute(conn, "SELECT * FROM votes WHERE election_id = %s", (eid,))
+        votes = cur.fetchall()
+        cur2 = db_execute(conn, "SELECT candidate_id, name FROM candidates WHERE election_id = %s", (eid,))
+        candidates = cur2.fetchall()
         candidate_map = {c['candidate_id']: c['name'] for c in candidates}
 
         results = {name: 0 for name in candidate_map.values()}
@@ -992,12 +1113,13 @@ def get_public_results(eid):
 def get_public_audit_trail():
     """US 4.4: Allows observers to see security events (but not private data)."""
     conn = get_db()
-    logs = conn.execute("""
+    cur = db_execute(conn, """
         SELECT action, table_name, created_at 
         FROM audit_log 
         ORDER BY created_at DESC 
         LIMIT 50
-    """).fetchall()
+    """)
+    logs = cur.fetchall()
     conn.close()
     return jsonify([dict(log) for log in logs])
 
@@ -1011,7 +1133,8 @@ def verify_receipt():
 
     conn = get_db()
     try:
-        vote = conn.execute("SELECT * FROM votes WHERE vote_id = ?", (vote_id,)).fetchone()
+        cur = db_execute(conn, "SELECT * FROM votes WHERE vote_id = %s", (vote_id,))
+        vote = cur.fetchone()
 
         if not vote:
             return jsonify(success=False, message="Receipt not found"), 404
@@ -1040,8 +1163,8 @@ def toggle_status():
     new_status = data.get("status")
 
     conn = get_db()
-    conn.execute("UPDATE elections SET status = ? WHERE election_id = ?", (new_status, eid))
-    conn.execute("INSERT INTO system_logs (event_type, details, admin_id) VALUES (?, ?, ?)",
+    db_execute(conn, "UPDATE elections SET status = %s WHERE election_id = %s", (new_status, eid))
+    db_execute(conn, "INSERT INTO system_logs (event_type, details, admin_id) VALUES (%s, %s, %s)",
                  ('STATUS_CHANGE', f"Election {eid} moved to {new_status}", 'ADMIN_01'))
     conn.commit()
     conn.close()
@@ -1052,7 +1175,9 @@ def toggle_status():
 @token_required
 def get_admin_stats():
     conn = get_db()
-    voter_count = conn.execute("SELECT COUNT(*) FROM users WHERE role='voter'").fetchone()[0]
+    cur = db_execute(conn, "SELECT COUNT(*) as cnt FROM users WHERE role='voter'")
+    row = cur.fetchone()
+    voter_count = row['cnt']
     conn.close()
     return jsonify({
         "totalVoters": voter_count,
@@ -1070,7 +1195,8 @@ def export_election_report_pdf(eid):
 
     try:
         conn = get_db()
-        election = conn.execute("SELECT title FROM elections WHERE election_id = ?", (eid,)).fetchone()
+        cur = db_execute(conn, "SELECT title FROM elections WHERE election_id = %s", (eid,))
+        election = cur.fetchone()
         title = election['title'] if (election and election['title']) else "Official Election Report"
 
         audit_data = perform_live_audit(eid)
@@ -1132,4 +1258,4 @@ def export_election_report_pdf(eid):
 
 
 if __name__ == "__main__":
-    app.run(port=5001, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)

@@ -89,7 +89,7 @@ export default function Login() {
       const userIdHash = sessionStorage.getItem("userIdHash");
 
       const response = await axios.post(
-        "http://localhost:5001/api/verify-otp",
+        "/api/verify-otp",
         {
           userIdHash,
           otp,

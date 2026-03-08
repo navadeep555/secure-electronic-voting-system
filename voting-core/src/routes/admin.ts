@@ -1,5 +1,5 @@
 import { Router, Response, Request } from "express";
-import { openDB } from "../db";
+import { pool } from "../db";
 import { authorize } from "../middleware/auth";
 import * as crypto from "crypto";
 
@@ -29,14 +29,13 @@ function decryptVote(encryptedVote: string, key: string): string {
  */
 router.get("/elections", authorize(["admin"]), async (req: Request, res: Response) => {
   try {
-    const db = await openDB();
-    const elections = await db.all(`
-      SELECT e.*, 
+    const { rows } = await pool.query(`
+      SELECT e.*,
       (SELECT COUNT(*) FROM candidates c WHERE c.election_id = e.election_id) as candidate_count
       FROM elections e
       ORDER BY e.created_at DESC
     `);
-    res.json(elections);
+    res.json(rows);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch elections." });
   }
@@ -47,33 +46,35 @@ router.get("/elections", authorize(["admin"]), async (req: Request, res: Respons
  */
 router.post("/setup-election", authorize(["admin"]), async (req: any, res: Response) => {
   const { title, description, start_time, end_time, candidates } = req.body;
-  const db = await openDB();
+  const client = await pool.connect();
 
   try {
-    await db.run("BEGIN TRANSACTION");
+    await client.query("BEGIN");
     const electionId = crypto.randomUUID();
 
-    await db.run(
-      `INSERT INTO elections (election_id, title, description, start_time, end_time, status, created_by, created_at) 
-       VALUES (?, ?, ?, ?, ?, 'DRAFT', ?, ?)`,
+    await client.query(
+      `INSERT INTO elections (election_id, title, description, start_time, end_time, status, created_by, created_at)
+       VALUES ($1, $2, $3, $4, $5, 'DRAFT', $6, $7)`,
       [electionId, title, description, start_time, end_time, req.user.userId, Date.now()]
     );
 
     if (candidates && Array.isArray(candidates)) {
       for (const cand of candidates) {
-        await db.run(
-          `INSERT INTO candidates (candidate_id, election_id, name, party) VALUES (?, ?, ?, ?)`,
+        await client.query(
+          `INSERT INTO candidates (candidate_id, election_id, name, party) VALUES ($1, $2, $3, $4)`,
           [crypto.randomUUID(), electionId, cand.name, cand.party]
         );
       }
     }
 
-    await db.run("COMMIT");
+    await client.query("COMMIT");
     res.json({ success: true, electionId, message: "Election created as DRAFT." });
   } catch (error) {
-    await db.run("ROLLBACK");
+    await client.query("ROLLBACK");
     console.error(error);
     res.status(500).json({ error: "Failed to initialize election." });
+  } finally {
+    client.release();
   }
 });
 
@@ -83,24 +84,24 @@ router.post("/setup-election", authorize(["admin"]), async (req: any, res: Respo
 router.patch("/update-candidate/:candidateId", authorize(["admin"]), async (req, res) => {
   const { candidateId } = req.params;
   const { name, party } = req.body;
-  const db = await openDB();
 
-  const election = await db.get(
-    `SELECT e.status FROM elections e 
-     JOIN candidates c ON e.election_id = c.election_id 
-     WHERE c.candidate_id = ?`,
+  const electionRes = await pool.query(
+    `SELECT e.status FROM elections e
+     JOIN candidates c ON e.election_id = c.election_id
+     WHERE c.candidate_id = $1`,
     [candidateId]
   );
 
-  if (election && election.status !== 'DRAFT') {
+  const election = electionRes.rows[0];
+  if (election && election.status !== "DRAFT") {
     return res.status(403).json({
       success: false,
-      message: `Integrity Lock: Cannot modify candidates when election is ${election.status}.`
+      message: `Integrity Lock: Cannot modify candidates when election is ${election.status}.`,
     });
   }
 
-  await db.run(
-    "UPDATE candidates SET name = ?, party = ? WHERE candidate_id = ?",
+  await pool.query(
+    "UPDATE candidates SET name = $1, party = $2 WHERE candidate_id = $3",
     [name, party, candidateId]
   );
 
@@ -112,52 +113,60 @@ router.patch("/update-candidate/:candidateId", authorize(["admin"]), async (req,
  */
 router.post("/register-voters", authorize(["admin"]), async (req: any, res: Response) => {
   const { electionId, voterHashes } = req.body;
-  const db = await openDB();
 
   if (!electionId || !voterHashes) {
     return res.status(400).json({ error: "Missing electionId or voter list." });
   }
 
+  const client = await pool.connect();
   try {
-    await db.run("BEGIN TRANSACTION");
+    await client.query("BEGIN");
     for (const hash of voterHashes) {
-      await db.run(
-        "INSERT OR IGNORE INTO election_voters (election_id, user_id_hash, has_voted) VALUES (?, ?, 0)",
+      await client.query(
+        `INSERT INTO election_voters (election_id, user_id_hash, has_voted)
+         VALUES ($1, $2, 0)
+         ON CONFLICT (election_id, user_id_hash) DO NOTHING`,
         [electionId, hash]
       );
     }
-    await db.run("COMMIT");
+    await client.query("COMMIT");
     res.json({ success: true, message: `${voterHashes.length} voters added.` });
   } catch (error) {
-    await db.run("ROLLBACK");
+    await client.query("ROLLBACK");
     res.status(500).json({ error: "Failed to upload voter list." });
+  } finally {
+    client.release();
   }
 });
 
 /**
- * --- NEW: Auto-register a single voter to all ACTIVE elections ---
+ * Auto-register a single voter to all ACTIVE elections
  */
 router.post("/register-voter-auto", authorize(["admin"]), async (req, res) => {
   const { userIdHash } = req.body;
-  const db = await openDB();
 
-  const activeElections = await db.all(
+  const { rows: activeElections } = await pool.query(
     "SELECT election_id FROM elections WHERE status='ACTIVE'"
   );
 
+  const client = await pool.connect();
   try {
-    await db.run("BEGIN TRANSACTION");
+    await client.query("BEGIN");
     for (const e of activeElections) {
-      await db.run(
-        "INSERT OR IGNORE INTO election_voters (election_id, user_id_hash, has_voted) VALUES (?, ?, 0)",
+      await client.query(
+        `INSERT INTO election_voters (election_id, user_id_hash, has_voted)
+         VALUES ($1, $2, 0)
+         ON CONFLICT (election_id, user_id_hash) DO NOTHING`,
         [e.election_id, userIdHash]
       );
     }
-    await db.run("COMMIT");
+    await client.query("COMMIT");
     res.json({ success: true, message: "User registered to all active elections" });
   } catch (err) {
-    await db.run("ROLLBACK");
+    await client.query("ROLLBACK");
     res.status(500).json({ error: "Failed to register voter" });
+  } finally {
+    client.release();
   }
 });
 
@@ -166,10 +175,12 @@ router.post("/register-voter-auto", authorize(["admin"]), async (req, res) => {
  */
 router.patch("/election-status", authorize(["admin"]), async (req: any, res: Response) => {
   const { electionId, status } = req.body;
-  const db = await openDB();
 
   try {
-    await db.run("UPDATE elections SET status = ? WHERE election_id = ?", [status.toUpperCase(), electionId]);
+    await pool.query(
+      "UPDATE elections SET status = $1 WHERE election_id = $2",
+      [status.toUpperCase(), electionId]
+    );
     res.json({ success: true, message: `Election status updated to ${status}.` });
   } catch (error) {
     res.status(500).json({ error: "Failed to update status." });
@@ -182,29 +193,38 @@ router.patch("/election-status", authorize(["admin"]), async (req: any, res: Res
 router.get("/tally/:electionId", authorize(["admin"]), async (req: any, res: Response) => {
   const { electionId } = req.params;
   const { decryptionKey } = req.query;
-  const db = await openDB();
 
-  const election = await db.get("SELECT status FROM elections WHERE election_id = ?", [electionId]);
+  const electionRes = await pool.query(
+    "SELECT status FROM elections WHERE election_id = $1",
+    [electionId]
+  );
 
-  if (!election || election.status !== 'CLOSED') {
+  const election = electionRes.rows[0];
+  if (!election || election.status !== "CLOSED") {
     return res.status(403).json({ message: "Tallying is only allowed for CLOSED elections." });
   }
 
-  const votes = await db.all("SELECT encrypted_vote FROM votes WHERE election_id = ?", [electionId]);
-  const candidates = await db.all("SELECT name, party FROM candidates WHERE election_id = ?", [electionId]);
+  const { rows: votes } = await pool.query(
+    "SELECT encrypted_vote FROM votes WHERE election_id = $1",
+    [electionId]
+  );
+  const { rows: candidates } = await pool.query(
+    "SELECT name, party FROM candidates WHERE election_id = $1",
+    [electionId]
+  );
 
   const tally: Record<string, number> = {};
-  candidates.forEach(c => tally[c.name] = 0);
+  candidates.forEach((c: any) => (tally[c.name] = 0));
 
-  votes.forEach(v => {
+  votes.forEach((v: any) => {
     const choice = decryptVote(v.encrypted_vote, decryptionKey as string);
     if (tally[choice] !== undefined) tally[choice]++;
   });
 
-  const formattedResults = candidates.map(c => ({
+  const formattedResults = candidates.map((c: any) => ({
     candidate_name: c.name,
     party: c.party,
-    vote_count: tally[c.name]
+    vote_count: tally[c.name],
   }));
 
   res.json({ success: true, results: formattedResults });
@@ -215,15 +235,18 @@ router.get("/tally/:electionId", authorize(["admin"]), async (req: any, res: Res
  */
 router.post("/add-candidate", authorize(["admin"]), async (req, res) => {
   const { electionId, name, party } = req.body;
-  const db = await openDB();
 
-  const election = await db.get("SELECT status FROM elections WHERE election_id = ?", [electionId]);
-  if (election.status !== 'DRAFT') {
+  const electionRes = await pool.query(
+    "SELECT status FROM elections WHERE election_id = $1",
+    [electionId]
+  );
+  const election = electionRes.rows[0];
+  if (election.status !== "DRAFT") {
     return res.status(403).json({ error: "Cannot add candidates to an active/closed election." });
   }
 
-  await db.run(
-    "INSERT INTO candidates (candidate_id, election_id, name, party) VALUES (?, ?, ?, ?)",
+  await pool.query(
+    "INSERT INTO candidates (candidate_id, election_id, name, party) VALUES ($1, $2, $3, $4)",
     [crypto.randomUUID(), electionId, name, party]
   );
   res.json({ success: true });

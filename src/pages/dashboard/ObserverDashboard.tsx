@@ -33,7 +33,7 @@ export default function ObserverDashboard() {
 
   const fetchElections = async () => {
     try {
-      const res = await axios.get("http://localhost:5001/api/admin/elections");
+      const res = await axios.get("/api/admin/elections");
       setElections(res.data);
       if (res.data.length > 0 && !selectedElection) {
         setSelectedElection(res.data[0]);
@@ -48,7 +48,7 @@ export default function ObserverDashboard() {
     setIsRefreshing(true);
     try {
       const res = await axios.get(
-        `http://localhost:5001/api/observer/results/${eid}`,
+        `/api/observer/results/${eid}`,
       );
       setAuditData(res.data);
       setLastRefresh(new Date());
@@ -123,11 +123,10 @@ export default function ObserverDashboard() {
                     setSelectedElection(election);
                     fetchAudit(election.election_id);
                   }}
-                  className={`px-6 py-3 rounded-t-sm text-sm font-bold uppercase tracking-wide transition-colors border-b-2 whitespace-nowrap ${
-                    selectedElection?.election_id === election.election_id
+                  className={`px-6 py-3 rounded-t-sm text-sm font-bold uppercase tracking-wide transition-colors border-b-2 whitespace-nowrap ${selectedElection?.election_id === election.election_id
                       ? "bg-white text-primary-900 border-primary-800"
                       : "bg-transparent text-neutral-500 hover:text-neutral-900 border-transparent hover:border-neutral-300"
-                  }`}
+                    }`}
                 >
                   {election.title}
                 </button>
@@ -230,11 +229,10 @@ export default function ObserverDashboard() {
                 </h2>
                 <div className="space-y-4">
                   <div
-                    className={`flex items-center justify-between p-4 rounded-sm border ${
-                      auditData?.audit_report?.system_status === "SECURE"
+                    className={`flex items-center justify-between p-4 rounded-sm border ${auditData?.audit_report?.system_status === "SECURE"
                         ? "bg-green-50 border-green-200"
                         : "bg-amber-50 border-amber-200"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="relative">

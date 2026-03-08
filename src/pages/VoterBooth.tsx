@@ -22,7 +22,7 @@ export default function VoterBooth({ electionId }: { electionId: string }) {
   // 2. Cast Ballot
   const castVote = async (candidateId: string) => {
     try {
-      const res = await axios.post(`http://localhost:5001/api/voter/vote`, {
+      const res = await axios.post(`/api/voter/vote`, {
         election_id: electionId,
         candidate_id: candidateId,
         voter_id: "VOTER_SIM_123", // In production, this comes from the auth token

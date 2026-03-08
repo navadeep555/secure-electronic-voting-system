@@ -44,7 +44,7 @@ export default function AuditView() {
       addLog("Connecting to Secure Ledger...");
 
       const res = await axios.get(
-        `http://localhost:5001/api/observer/results/${eid}`,
+        `/api/observer/results/${eid}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -102,11 +102,10 @@ export default function AuditView() {
           </div>
 
           <div
-            className={`p-8 rounded-2xl border-2 flex flex-col items-center text-center space-y-4 shadow-sm transition-colors ${
-              report?.system_status === "SECURE"
+            className={`p-8 rounded-2xl border-2 flex flex-col items-center text-center space-y-4 shadow-sm transition-colors ${report?.system_status === "SECURE"
                 ? "bg-emerald-50 border-emerald-200"
                 : "bg-red-50 border-red-200"
-            }`}
+              }`}
           >
             {report?.system_status === "SECURE" ? (
               <ShieldCheck size={64} className="text-emerald-600" />

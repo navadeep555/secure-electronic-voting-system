@@ -52,7 +52,7 @@ export function AdminVotersView() {
   const loadVoters = async () => {
     setIsLoading(true);
     try {
-      const res = await axios.get("http://localhost:5001/api/users", {
+      const res = await axios.get("/api/users", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setVoters(res.data);
@@ -181,11 +181,10 @@ export function AdminVotersView() {
                 {filteredVoters.map((voter) => (
                   <tr
                     key={voter.user_id_hash}
-                    className={`hover:bg-neutral-50 transition-all ${
-                      selectedVoterIds.includes(voter.user_id_hash)
+                    className={`hover:bg-neutral-50 transition-all ${selectedVoterIds.includes(voter.user_id_hash)
                         ? "bg-primary-50/50"
                         : ""
-                    }`}
+                      }`}
                   >
                     <td className="p-4">
                       <Checkbox

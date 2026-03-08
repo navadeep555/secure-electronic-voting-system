@@ -65,7 +65,7 @@ export default function AdminDashboard() {
       setDbElections(res.data);
 
       const statsRes = await axios.get(
-        "http://localhost:5001/api/admin/stats",
+        "/api/admin/stats",
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -90,7 +90,7 @@ export default function AdminDashboard() {
       const token = localStorage.getItem("token");
 
       const response = await axios.get(
-        `http://localhost:5001/api/admin/election/${electionId}/report/pdf`,
+        `/api/admin/election/${electionId}/report/pdf`,
         {
           headers: { Authorization: `Bearer ${token}` },
           responseType: "blob", // Handle binary data
@@ -121,7 +121,7 @@ export default function AdminDashboard() {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5001/api/admin/elections/${electionId}/toggle-publish`,
+        `/api/admin/elections/${electionId}/toggle-publish`,
         {},
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -168,11 +168,10 @@ export default function AdminDashboard() {
                 <button
                   key={item.key}
                   onClick={() => setActiveSection(item.key as any)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm font-medium transition-all ${
-                    activeSection === item.key
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm font-medium transition-all ${activeSection === item.key
                       ? "bg-red-50 text-[#800020] border-l-4 border-[#800020]"
                       : "text-neutral-500 hover:bg-neutral-50 border-l-4 border-transparent"
-                  }`}
+                    }`}
                 >
                   <item.icon className="h-5 w-5" />
                   {item.label}

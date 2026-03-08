@@ -16,7 +16,7 @@ interface Election {
   status: string;
 }
 
-const API_BASE = "http://localhost:5001/api/voter";
+const API_BASE = "/api/voter";
 
 export default function VoterDashboard() {
   const [elections, setElections] = useState<Election[]>([]);
