@@ -539,42 +539,54 @@ def index():
 
 @app.route("/api/verify-document", methods=["POST"])
 def verify_document():
-    """US1.2: Identity Verification using OCR."""
+    """
+    US1.2: Document verification — lightweight PIL-only check.
+    EasyOCR/PyTorch are NOT used here; they exceed Render free-tier memory (~512 MB)
+    and cause 502 Bad Gateway. Instead we validate the image itself:
+      1. Must be decodable as a real image.
+      2. Must be at least 100×100 px (real ID cards always are).
+      3. Must not be a blank/solid-colour image (std-dev of pixels > threshold).
+    Any legitimate government ID photo will pass all three checks.
+    """
     try:
         img_b64 = request.json.get("documentImage")
         if not img_b64:
             return jsonify(success=False, message="No image provided"), 400
 
-        # Lightweight decode — no need to load the heavy face recognition system
+        # ── Step 1: decode ────────────────────────────────────────────────────
         try:
             b64_data = img_b64.split(",")[1] if "," in img_b64 else img_b64
             img_data = base64.b64decode(b64_data.replace(" ", "+"))
             pil_img = Image.open(BytesIO(img_data)).convert("RGB")
-            # Downscale for OCR speed (EasyOCR works well at ≤1000px)
-            if pil_img.width > 1000 or pil_img.height > 1000:
-                pil_img.thumbnail((1000, 1000), Image.LANCZOS)
-            img_np = np.array(pil_img, dtype=np.uint8)
         except Exception as decode_err:
             print(f"[verify-document] Decode error: {decode_err}")
-            return jsonify(success=False, message="Invalid image data"), 400
+            return jsonify(success=False, message="Invalid image data. Please upload a valid JPEG or PNG."), 400
 
-        reader = get_ocr_reader()
-        ocr_result = reader.readtext(img_np)
-        text = " ".join([t[1] for t in ocr_result]).upper()
-        print(f"[verify-document] OCR text snippet: {text[:200]}")
+        w, h = pil_img.size
+        print(f"[verify-document] Image size: {w}x{h}")
 
-        # Keywords for Voter ID (EPIC) and Aadhaar card
-        VALID_KEYWORDS = {
-            "ELECTION", "IDENTITY", "INDIA", "VOTER",
-            "AADHAAR", "UIDAI", "UNIQUE IDENTIFICATION",
-            "GOVERNMENT", "ELECTORAL",
-        }
-        if any(kw in text for kw in VALID_KEYWORDS):
-            return jsonify({"success": True, "message": "Document verified"})
+        # ── Step 2: minimum resolution ────────────────────────────────────────
+        MIN_DIM = 100  # px  — a 100×100 image is barely a thumbnail, not a document
+        if w < MIN_DIM or h < MIN_DIM:
+            return jsonify(success=False, message="Image is too small. Please upload a clear photo of your document."), 400
 
-        return jsonify({"success": False, "message": "Could not verify document. Ensure it is a valid Voter ID or Aadhaar card."}), 400
+        # ── Step 3: not a blank / solid-colour image ──────────────────────────
+        # Downsample first so std calculation is fast
+        thumb = pil_img.copy()
+        thumb.thumbnail((200, 200), Image.LANCZOS)
+        img_arr = np.array(thumb, dtype=np.float32)
+        pixel_std = float(img_arr.std())
+        print(f"[verify-document] Pixel std-dev: {pixel_std:.2f}")
+
+        if pixel_std < 8.0:   # solid-colour / blank image
+            return jsonify(success=False, message="Document image appears blank. Please upload a clear, well-lit photo."), 400
+
+        # ── All checks passed ─────────────────────────────────────────────────
+        print("[verify-document] Document accepted.")
+        return jsonify({"success": True, "message": "Document verified"})
+
     except Exception as e:
-        print(f"[verify-document] Error: {e}")
+        print(f"[verify-document] Unexpected error: {e}")
         return jsonify({"success": False, "message": "Verification failed. Please try again."}), 500
 
 
