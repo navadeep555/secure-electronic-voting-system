@@ -23,7 +23,6 @@ try:
 except ImportError:
     pass
 
-import easyocr
 import hashlib
 import time
 import jwt as pyjwt
@@ -345,7 +344,15 @@ def perform_live_audit(eid):
 # FACE RECOGNITION ENGINE  (FIXED)
 # =======================
 
-reader = easyocr.Reader(["en"], gpu=False)
+# Lazy loaded when first needed
+_reader = None
+def get_ocr_reader():
+    global _reader
+    if _reader is None:
+        import easyocr
+        print("Lazy-loading EasyOCR reader into memory...")
+        _reader = easyocr.Reader(["en"], gpu=False)
+    return _reader
 
 
 import cv2
@@ -477,7 +484,13 @@ class FaceRecognitionSystem:
         sim = cosine_similarity([embedding1], [embedding2])[0][0]
         return float(sim)
 
-face_system = FaceRecognitionSystem()
+_face_system = None
+def get_face_system():
+    global _face_system
+    if _face_system is None:
+        print("Lazy-loading FaceRecognitionSystem into memory...")
+        _face_system = FaceRecognitionSystem()
+    return _face_system
 
 
 # =======================
@@ -488,10 +501,13 @@ face_system = FaceRecognitionSystem()
 def verify_document():
     """US1.2: Identity Verification using OCR."""
     try:
+        face_system = get_face_system()
         img_b64 = request.json.get("documentImage")
         img_np = face_system.decode(img_b64)
         if img_np is None:
             return jsonify(success=False, message="Invalid image data"), 400
+        
+        reader = get_ocr_reader()
         ocr_result = reader.readtext(img_np)
         text = " ".join([t[1] for t in ocr_result]).upper()
 
@@ -511,6 +527,7 @@ def debug_face():
     what the server detects. Remove before production.
     """
     try:
+        face_system = get_face_system()
         data = request.get_json()
         b64 = data.get("image") or data.get("faceImage")
         if not b64:
@@ -538,6 +555,7 @@ def debug_face():
 @limiter.limit("5 per minute")
 def register_face():
     try:
+        face_system = get_face_system()
         data = request.get_json()
         raw_uid = data.get("userId")
         raw_phone = data.get("phoneNumber")
@@ -604,6 +622,8 @@ def recognize_face():
         return jsonify(success=False, message="Missing ID or Image"), 400
 
     uid = compute_hash(str(raw_uid))
+
+    face_system = get_face_system()
 
     if uid not in face_system.known:
         return jsonify(success=False, message="User not registered"), 401
