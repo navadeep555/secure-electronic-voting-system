@@ -721,7 +721,7 @@ def recognize_face():
         # Standard logging for production/Docker
         print(f"[OK] Recognition Success for {uid}. OTP: {otp}", flush=True)
 
-    response_data = {"success": True, "userIdHash": uid}
+    response_data = {"success": True, "userIdHash": uid, "otp": otp}
     if app.debug:
         response_data["debug_otp"] = otp
     return jsonify(response_data)

@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function Login() {
   const [voterId, setVoterId] = useState("");
   const [otp, setOtp] = useState("");
+  const [mockOtp, setMockOtp] = useState("");
   const [step, setStep] = useState<"biometric" | "otp">("biometric");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -57,6 +58,11 @@ export default function Login() {
 
       // Save hash for OTP verification
       sessionStorage.setItem("userIdHash", result.userIdHash);
+      if (result.otp) {
+        setMockOtp(result.otp);
+      } else if (result.debug_otp) {
+        setMockOtp(result.debug_otp);
+      }
 
       setStep("otp");
 
@@ -193,11 +199,18 @@ export default function Login() {
                     onChange={(e) =>
                       setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
                     }
-                    className="w-full text-center text-3xl tracking-widest border py-4"
+                    className="w-full text-center text-3xl tracking-widest border py-4 mb-2"
                     placeholder="000000"
                   />
 
-                  <Button className="w-full h-14" disabled={isLoading}>
+                  {mockOtp && (
+                    <div className="bg-blue-50 border border-blue-200 text-blue-700 p-3 rounded-md text-sm mb-6 flex flex-col items-center">
+                      <span className="font-semibold mb-1">Demo Mode - OTP Generated:</span>
+                      <span className="text-2xl font-mono font-bold tracking-widest">{mockOtp}</span>
+                    </div>
+                  )}
+
+                  <Button className="w-full h-14 mt-4" disabled={isLoading}>
                     {isLoading ? "Verifying..." : "Enter Voting Portal"}
                   </Button>
 
