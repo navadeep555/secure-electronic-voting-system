@@ -60,3 +60,11 @@ initDB().then(() => {
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });
 });
+
+app.get("/", (req, res) => {
+  res.status(200).json({
+    service: "Secure Electronic Voting System - Voting Core API",
+    status: "Healthy 🟢",
+    timestamp: new Date().toISOString()
+  });
+});
