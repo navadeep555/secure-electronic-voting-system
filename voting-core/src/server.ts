@@ -26,9 +26,26 @@ const apiLimiter = rateLimit({
 // Apply the rate limiting middleware to API calls
 app.use("/api/", apiLimiter);
 
-// 1. IMPROVED CORS: Explicitly allow the Authorization header
+// 1. IMPROVED CORS: Allow frontend URL from env (for production) or localhost (for dev)
+const defaultOrigins = [
+  "http://localhost:8080",
+  "http://localhost:3000",
+  "http://localhost:5173",
+];
+const envOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+  : [];
+const allowedOrigins = [...defaultOrigins, ...envOrigins];
+
 app.use(cors({
-  origin: "http://localhost:8080", // Your Frontend URL
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS: Origin '${origin}' is not allowed.`));
+    }
+  },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
