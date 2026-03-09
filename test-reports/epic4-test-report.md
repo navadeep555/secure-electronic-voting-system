@@ -21,3 +21,15 @@
 
 ## Conclusion
 Transparency and observation features function correctly.
+
+## Test Environment
+
+Frontend: React  
+Backend: Flask API  
+
+Tools Used:
+- Postman
+- Browser Developer Tools
+
+Platform:
+- macOS
