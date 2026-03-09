@@ -172,7 +172,11 @@ def auto_close_expired_elections():
 
 def get_db():
     """Return a psycopg2 connection with RealDictCursor (rows act like dicts)."""
-    conn = psycopg2.connect(**DB_CONFIG)
+    db_url = os.getenv("DATABASE_URL")
+    if db_url:
+        conn = psycopg2.connect(db_url)
+    else:
+        conn = psycopg2.connect(**DB_CONFIG)
     conn.autocommit = False
     return conn
 
@@ -194,7 +198,20 @@ def compute_hash(data_string):
 # =======================
 
 def init_db():
-    conn = get_db()
+    print("⏳ Initializing database connection...")
+    conn = None
+    for attempt in range(1, 11):
+        try:
+            conn = get_db()
+            print(f"✅ Database connection established on attempt {attempt}")
+            break
+        except Exception as e:
+            print(f"⚠️ Connection attempt {attempt}/10 failed: {e}")
+            if attempt == 10:
+                print("❌ CRITICAL: Could not connect to database after 10 attempts.")
+                raise e
+            time.sleep(3)
+
     c = conn.cursor()
 
     c.execute("""
