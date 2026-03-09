@@ -1,22 +1,5 @@
 services:
 
-  # -------------------------------
-  # PostgreSQL Database
-  # -------------------------------
-  postgres:
-    image: postgres:16-alpine
-    container_name: voting-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: voting
-      POSTGRES_PASSWORD: voting123
-      POSTGRES_DB: votingdb
-    ports:
-      - "5433:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    networks:
-      - voting-net
 
   # -------------------------------
   # Flask Backend
@@ -27,20 +10,11 @@ services:
       dockerfile: Dockerfile
     container_name: voting-flask-api
     restart: unless-stopped
-    depends_on:
-      - postgres
     volumes:
       - ./backend:/app
       - ./backend/encodings:/app/encodings
-    environment:
-      JWT_SECRET: change_this_secret
-      DB_INTEGRITY_KEY: change_integrity_key
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: voting
-      DB_PASSWORD: voting123
-      DB_NAME: votingdb
-      DATABASE_URL: postgresql://voting:voting123@postgres:5432/votingdb
+    env_file:
+      - ./backend/.env
     ports:
       - "5000:5000"
     networks:
@@ -56,17 +30,8 @@ services:
       dockerfile: voting-core/Dockerfile
     container_name: voting-core-api
     restart: unless-stopped
-    depends_on:
-      - postgres
-    environment:
-      NODE_ENV: production
-      PORT: 3001
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: voting
-      DB_PASSWORD: voting123
-      DB_NAME: votingdb
-      DATABASE_URL: postgresql://voting:voting123@postgres:5432/votingdb
+    env_file:
+      - ./voting-core/.env
     ports:
       - "3001:3001"
     networks:
@@ -118,8 +83,4 @@ networks:
     driver: bridge
 
 
-# -------------------------------
-# Volumes
-# -------------------------------
-volumes:
-  pgdata:
+
