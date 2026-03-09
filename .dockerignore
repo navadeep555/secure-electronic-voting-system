@@ -30,9 +30,11 @@ DevOpsStrategy.md
 .env
 .env.*
 
-# SQLite databases (use Docker named volumes instead)
+# Database files (use Docker named volumes instead)
 *.db
 *.sqlite3
+backups/
+*.sql
 
 # Windows-only wheel (not needed in Linux containers)
 *.whl

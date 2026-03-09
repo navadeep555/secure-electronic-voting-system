@@ -43,6 +43,8 @@ from functools import wraps
 from flask_talisman import Talisman
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+import security_monitor
+import subprocess
 
 # =======================
 # APP SETUP
@@ -144,6 +146,14 @@ def token_required(f):
             token = auth_header.split(" ")[1] if " " in auth_header else auth_header
             pyjwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
         except Exception as e:
+            conn = get_db()
+            security_monitor.log_system_event(
+                conn, 
+                "UNAUTHORIZED_ACCESS", 
+                f"Invalid token or access attempt: {str(e)}", 
+                source_ip=request.remote_addr
+            )
+            conn.close()
             return jsonify({'message': f'Invalid token: {str(e)}'}), 401
         return f(*args, **kwargs)
     return decorated
@@ -172,7 +182,11 @@ def auto_close_expired_elections():
 
 def get_db():
     """Return a psycopg2 connection with RealDictCursor (rows act like dicts)."""
-    conn = psycopg2.connect(**DB_CONFIG)
+    db_url = os.getenv("DATABASE_URL")
+    if db_url:
+        conn = psycopg2.connect(db_url)
+    else:
+        conn = psycopg2.connect(**DB_CONFIG)
     conn.autocommit = False
     return conn
 
@@ -194,7 +208,20 @@ def compute_hash(data_string):
 # =======================
 
 def init_db():
-    conn = get_db()
+    print("⏳ Initializing database connection...")
+    conn = None
+    for attempt in range(1, 11):
+        try:
+            conn = get_db()
+            print(f"✅ Database connection established on attempt {attempt}")
+            break
+        except Exception as e:
+            print(f"⚠️ Connection attempt {attempt}/10 failed: {e}")
+            if attempt == 10:
+                print("❌ CRITICAL: Could not connect to database after 10 attempts.")
+                raise e
+            time.sleep(3)
+
     c = conn.cursor()
 
     c.execute("""
@@ -327,6 +354,12 @@ def perform_live_audit(eid):
 
         if expected_sig != v['integrity_signature']:
             tampered_found = True
+            security_monitor.log_security_alert(
+                conn,
+                "TAMPERING_DETECTED",
+                f"Integrity mismatch for vote {v['vote_id']} during audit",
+                affected_table="votes"
+            )
             break
 
         if v['candidate_id'] in results_map:
@@ -670,6 +703,14 @@ def register_face():
 
     except Exception as e:
         print(f"[ERROR] CRITICAL ERROR: {e}")
+        conn = get_db()
+        security_monitor.log_system_event(
+            conn, 
+            "FACE_REGISTRATION_FAILURE", 
+            f"Error during face registration: {str(e)}", 
+            source_ip=request.remote_addr
+        )
+        conn.close()
         return jsonify(success=False, message="Internal Server error"), 500
 
 
@@ -688,6 +729,21 @@ def recognize_face():
     face_system = get_face_system()
 
     if uid not in face_system.known:
+        conn = get_db()
+        security_monitor.log_system_event(
+            conn,
+            "LOGIN_FAILURE",
+            f"Login attempt for unregistered user (hash: {uid[:8]}...)",
+            source_ip=request.remote_addr
+        )
+        if security_monitor.detect_bruteforce(conn, request.remote_addr):
+            security_monitor.log_security_alert(
+                conn,
+                "BRUTE_FORCE_ATTEMPT",
+                f"Multiple failed logins detected from IP {request.remote_addr}",
+                affected_table="users"
+            )
+        conn.close()
         return jsonify(success=False, message="User not registered"), 401
 
     img_arr = face_system.decode(img_b64)
@@ -702,6 +758,21 @@ def recognize_face():
     best_match = max(similarities) if similarities else 0
     print(f"  Best cosine similarity: {best_match:.4f} (threshold: {face_system.SIMILARITY_THRESHOLD})")
     if best_match < face_system.SIMILARITY_THRESHOLD:
+        conn = get_db()
+        security_monitor.log_system_event(
+            conn, 
+            "LOGIN_FAILURE", 
+            f"Face mismatch for user {uid}. Similarity: {best_match:.4f}", 
+            source_ip=request.remote_addr
+        )
+        if security_monitor.detect_bruteforce(conn, request.remote_addr):
+            security_monitor.log_security_alert(
+                conn, 
+                "BRUTE_FORCE_ATTEMPT", 
+                f"Multiple failed logins detected from IP {request.remote_addr}", 
+                affected_table="users"
+            )
+        conn.close()
         return jsonify(success=False, message="Face mismatch. Please try again."), 401
 
     otp = str(random.randint(100000, 999999))
@@ -737,6 +808,12 @@ def verify_otp():
     row = cur.fetchone()
 
     if not row or row['otp'] != otp or (time.time() - int(row['otp_time']) > OTP_EXPIRY_SECONDS):
+        security_monitor.log_system_event(
+            conn, 
+            "OTP_FAILURE", 
+            f"Invalid or expired OTP attempt for user {uid}", 
+            source_ip=request.remote_addr
+        )
         conn.close()
         return jsonify(success=False, message="Invalid/Expired OTP"), 401
 
@@ -831,6 +908,12 @@ def cast_vote():
         voter_check = cur.fetchone()
 
         if voter_check and voter_check['has_voted']:
+            security_monitor.log_security_alert(
+                conn, 
+                "DUPLICATE_VOTE_ATTEMPT", 
+                f"User {voter_id} attempted to vote twice in election {eid}", 
+                affected_table="votes"
+            )
             return jsonify(success=False, message="Already voted"), 403
 
         cur = db_execute(conn, "SELECT block_hash FROM votes ORDER BY timestamp DESC LIMIT 1")
@@ -973,6 +1056,29 @@ def admin_login():
         return jsonify({"success": True, "token": token, "role": "admin"}), 200
 
     return jsonify({"success": False, "message": "Invalid credentials"}), 401
+
+
+@app.route("/api/security-status", methods=["GET"])
+def get_security_status():
+    """GET /security-status: Returns the system health and threat level."""
+    conn = get_db()
+    try:
+        threat_level = security_monitor.get_threat_level(conn)
+        status = "secure" if threat_level == "low" else "monitored"
+        if threat_level == "high":
+            status = "alerted"
+            
+        recent_events = security_monitor.get_recent_security_events(conn)
+        
+        return jsonify({
+            "system_status": status,
+            "threat_level": threat_level,
+            "recent_security_events": recent_events
+        }), 200
+    except Exception as e:
+        return jsonify(success=False, message=str(e)), 500
+    finally:
+        conn.close()
 
 
 @app.route("/api/admin/elections/<eid>/status", methods=["PATCH"])
@@ -1182,6 +1288,12 @@ def get_public_results(eid):
             else:
                 tampered_count += 1
                 tampered_ids.append(v['vote_id'])
+                security_monitor.log_security_alert(
+                    conn, 
+                    "TAMPERING_DETECTED", 
+                    f"Integrity failure for vote {v['vote_id']} during results fetch", 
+                    affected_table="votes"
+                )
 
         if verified_count < 3 and verified_count > 0:
             return jsonify({
@@ -1287,6 +1399,42 @@ def get_admin_stats():
         "activeElections": 3,
         "systemStatus": "Optimal"
     })
+
+
+@app.route("/api/admin/backup", methods=["POST"])
+# @roles_required(['admin'])
+def trigger_backup():
+    """ Triggers a manual database backup."""
+    try:
+        # Run the backup script
+        result = subprocess.run(
+            ["bash", "/app/backup_database.sh"], 
+            capture_output=True, 
+            text=True
+        )
+        
+        conn = get_db()
+        if result.returncode == 0:
+            security_monitor.log_system_event(
+                conn, 
+                "ADMIN_BACKUP_TRIGGERED", 
+                "Manual backup triggered and completed successfully by Admin",
+                admin_id=getattr(request, 'user', {}).get('userId', 'admin')
+            )
+            conn.close()
+            return jsonify(success=True, message="Backup completed successfully", output=result.stdout), 200
+        else:
+            security_monitor.log_system_event(
+                conn, 
+                "ADMIN_BACKUP_FAILED", 
+                f"Manual backup failed: {result.stderr}",
+                admin_id=getattr(request, 'user', {}).get('userId', 'admin')
+            )
+            conn.close()
+            return jsonify(success=False, message="Backup failed", error=result.stderr), 500
+            
+    except Exception as e:
+        return jsonify(success=False, message=f"Internal error during backup: {str(e)}"), 500
 
 
 @app.route('/api/admin/election/<eid>/report/pdf', methods=['GET'])
