@@ -231,36 +231,66 @@ jobs:
           fi
 
   # ════════════════════════════════════════════════════════════
-  # JOB 6 – Deploy Backend to Render
+  # JOB 6 – Deploy Flask Backend to Render
   # Runs ONLY after all CI jobs pass, and ONLY on push to main
-  # (not on pull requests — we never deploy unmerged code)
   # ════════════════════════════════════════════════════════════
-  deploy-backend:
-    name: Deploy Backend to Render
+  deploy-flask-backend:
+    name: Deploy Backend to Render (Flask)
     runs-on: ubuntu-latest
     needs: [lint-backend, build-voting-core, build-frontend, validate-docker, check-env-vars]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
-      - name: Trigger Render deploy (Flask backend + voting-core)
+      - name: Trigger Render deploy (Flask backend)
         env:
-          RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          RENDER_HOOK: ${{ secrets.RENDER_FLASK_DEPLOY_HOOK_URL }}
         run: |
           if [ -z "$RENDER_HOOK" ]; then
-            echo "WARNING: RENDER_DEPLOY_HOOK_URL secret is not set."
+            echo "WARNING: RENDER_FLASK_DEPLOY_HOOK_URL secret is not set."
             echo "Skipping automatic Render deployment trigger."
             echo "To enable, add your Render Deploy Hook URL to GitHub Secrets."
             exit 0
           fi
           
-          echo "Triggering Render backend deployment..."
+          echo "Triggering Render Flask backend deployment..."
           curl -s --fail-with-body \
             -X POST "$RENDER_HOOK" \
             -o /tmp/render_response.json
           echo "Render API response:"
           cat /tmp/render_response.json
           echo ""
-          echo "Render deploy triggered successfully"
+          echo "Render Flask deploy triggered successfully"
+
+  # ════════════════════════════════════════════════════════════
+  # JOB 7 – Deploy Voting Core to Render
+  # Runs in parallel with Flask deploy after CI jobs pass
+  # ════════════════════════════════════════════════════════════
+  deploy-voting-core:
+    name: Deploy Backend to Render (Node.js)
+    runs-on: ubuntu-latest
+    needs: [lint-backend, build-voting-core, build-frontend, validate-docker, check-env-vars]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Trigger Render deploy (Voting Core)
+        env:
+          RENDER_HOOK: ${{ secrets.RENDER_VOTING_CORE_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_HOOK" ]; then
+            echo "WARNING: RENDER_VOTING_CORE_DEPLOY_HOOK_URL secret is not set."
+            echo "Skipping automatic Render deployment trigger."
+            echo "To enable, add your Render Deploy Hook URL to GitHub Secrets."
+            exit 0
+          fi
+          
+          echo "Triggering Render Voting Core deployment..."
+          curl -s --fail-with-body \
+            -X POST "$RENDER_HOOK" \
+            -o /tmp/render_response.json
+          echo "Render API response:"
+          cat /tmp/render_response.json
+          echo ""
+          echo "Render Voting Core deploy triggered successfully"
 
   # ════════════════════════════════════════════════════════════
   # JOB 7 – Deploy Frontend to Vercel
