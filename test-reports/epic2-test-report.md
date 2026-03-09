@@ -32,3 +32,7 @@ Status: Pass
 Core voting functionality validated.
 Vote integrity and double-voting prevention confirmed.
 
+## Security Validation
+
+Confirmed that encrypted ballots cannot be modified after submission.
+Duplicate vote attempts were successfully blocked by the system.
