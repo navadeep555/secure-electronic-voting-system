@@ -5,8 +5,8 @@ services:
   # -------------------------------
   postgres:
     image: postgres:16-alpine
-    container_name: voting-postgres
-    restart: always
+    container_name: voting-db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: voting
       POSTGRES_PASSWORD: voting123
@@ -14,7 +14,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     networks:
       - voting-net
 
@@ -27,6 +27,8 @@ services:
       dockerfile: Dockerfile
     container_name: voting-flask-api
     restart: unless-stopped
+    depends_on:
+      - postgres
     volumes:
       - ./backend:/app
       - ./backend/encodings:/app/encodings
@@ -38,10 +40,9 @@ services:
       DB_USER: voting
       DB_PASSWORD: voting123
       DB_NAME: votingdb
+      DATABASE_URL: postgresql://voting:voting123@postgres:5432/votingdb
     ports:
       - "5000:5000"
-    depends_on:
-      - postgres
     networks:
       - voting-net
 
@@ -55,18 +56,19 @@ services:
       dockerfile: voting-core/Dockerfile
     container_name: voting-core-api
     restart: unless-stopped
+    depends_on:
+      - postgres
     environment:
       NODE_ENV: production
       PORT: 3001
       DB_HOST: postgres
+      DB_PORT: 5432
       DB_USER: voting
       DB_PASSWORD: voting123
       DB_NAME: votingdb
-      DB_PORT: 5432
+      DATABASE_URL: postgresql://voting:voting123@postgres:5432/votingdb
     ports:
       - "3001:3001"
-    depends_on:
-      - postgres
     networks:
       - voting-net
 
@@ -109,14 +111,15 @@ services:
 
 
 # -------------------------------
-# Volumes
-# -------------------------------
-volumes:
-  postgres_data:
-
-# -------------------------------
 # Network
 # -------------------------------
 networks:
   voting-net:
     driver: bridge
+
+
+# -------------------------------
+# Volumes
+# -------------------------------
+volumes:
+  pgdata:

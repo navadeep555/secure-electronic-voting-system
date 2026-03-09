@@ -2,16 +2,20 @@ import pkg from "pg";
 const { Pool } = pkg;
 
 // ── PostgreSQL connection pool ────────────────────────────────
-export const pool = new Pool({
-  host: process.env.DB_HOST || "localhost",
-  user: process.env.DB_USER || "voting",
-  password: process.env.DB_PASSWORD || "voting123",
-  database: process.env.DB_NAME || "votingdb",
-  port: Number(process.env.DB_PORT) || 5432,
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-});
+export const pool = new Pool(
+  process.env.DATABASE_URL
+    ? { connectionString: process.env.DATABASE_URL }
+    : {
+      host: process.env.DB_HOST || "localhost",
+      user: process.env.DB_USER || "voting",
+      password: process.env.DB_PASSWORD || "voting123",
+      database: process.env.DB_NAME || "votingdb",
+      port: Number(process.env.DB_PORT) || 5432,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    }
+);
 
 pool.on("error", (err: Error) => {
   console.error("❌ Unexpected PostgreSQL pool error:", err.message);
