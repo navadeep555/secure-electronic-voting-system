@@ -69,19 +69,22 @@ jobs:
             --exclude=.venv,venv,__pycache__,encodings,backups,chk_db.py
           echo "✅ Flake8 passed – no critical errors found"
 
-      # pytest: Run tests if any exist; skip gracefully if none
-      - name: Run pytest (if tests exist)
+      # pytest: Run unit tests only. Exclude test_monitoring.py — it is an
+      # integration test that requires a live Flask server on localhost:5000.
+      - name: Run pytest (unit tests only)
         working-directory: backend
         env:
           DATABASE_URL: ""
           JWT_SECRET: ci_test_secret_key_not_real
           DB_INTEGRITY_KEY: ci_test_integrity_key_not_real
         run: |
-          if find . -name "test_*.py" -o -name "*_test.py" | grep -q .; then
-            echo "Test files found. Running pytest..."
-            python -m pytest . -v --tb=short --ignore=.venv --ignore=venv
+          if find . -name "test_*.py" -not -name "test_monitoring.py" | grep -q .; then
+            echo "Unit test files found. Running pytest..."
+            python -m pytest . -v --tb=short \
+              --ignore=.venv --ignore=venv \
+              --ignore=test_monitoring.py
           else
-            echo "⚠️ No test files found in backend/. Skipping pytest."
+            echo "⚠️ No unit test files found in backend/. Skipping pytest."
           fi
 
   # ════════════════════════════════════════════════════════════
