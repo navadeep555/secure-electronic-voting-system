@@ -1,4 +1,9 @@
 import os
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
 import base64
 import numpy as np
 from flask_jwt_extended import JWTManager, create_access_token
@@ -18,7 +23,6 @@ try:
 except ImportError:
     pass
 
-import easyocr
 import hashlib
 import time
 import jwt as pyjwt
@@ -62,32 +66,55 @@ limiter = Limiter(
 JWT_SECRET = os.getenv("JWT_SECRET", "your_shared_secret")
 app.config['SECRET_KEY'] = JWT_SECRET
 jwt_manager = JWTManager(app)
+# Configure CORS - Combine defaults with environment variables
+allowed_origins = [
+    "http://localhost",
+    "http://localhost:80",
+    "http://localhost:8080",
+    "http://localhost:8081",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1",
+    "http://127.0.0.1:8080",
+    "http://127.0.0.1:8081",
+]
+
+env_origins = os.getenv("ALLOWED_ORIGINS")
+if env_origins:
+    # Handle comma-separated list of origins
+    allowed_origins.extend([o.strip() for o in env_origins.split(",")])
+
 CORS(
     app,
-    resources={r"/api/*": {"origins": [
-        "http://localhost",
-        "http://localhost:80",
-        "http://localhost:8080",
-        "http://localhost:8081",
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1",
-        "http://127.0.0.1:8080",
-        "http://127.0.0.1:8081",
-    ]}},
+    resources={r"/api/*": {"origins": allowed_origins}},
     supports_credentials=True,
     allow_headers=["Content-Type", "Authorization"],
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 )
 
 # PostgreSQL connection settings (from environment)
-DB_CONFIG = {
-    "host": os.getenv("DB_HOST", "postgres"),
-    "port": int(os.getenv("DB_PORT", 5432)),
-    "user": os.getenv("DB_USER", "voting"),
-    "password": os.getenv("DB_PASSWORD", "voting123"),
-    "dbname": os.getenv("DB_NAME", "votingdb"),
-}
+# On Render, DATABASE_URL is automatically injected.
+# Locally, individual DB_* variables are used (see docker-compose.yml).
+_DATABASE_URL = os.getenv("DATABASE_URL")
+if _DATABASE_URL:
+    import urllib.parse as _urlparse
+    _parsed = _urlparse.urlparse(_DATABASE_URL)
+    DB_CONFIG = {
+        "host": _parsed.hostname,
+        "port": _parsed.port or 5432,
+        "user": _parsed.username,
+        "password": _parsed.password,
+        "dbname": _parsed.path.lstrip("/"),
+        "sslmode": "require",   # Required for Render managed PostgreSQL
+    }
+else:
+    DB_CONFIG = {
+        "host": os.getenv("DB_HOST", "postgres"),
+        "port": int(os.getenv("DB_PORT", 5432)),
+        "user": os.getenv("DB_USER", "voting"),
+        "password": os.getenv("DB_PASSWORD", "voting123"),
+        "dbname": os.getenv("DB_NAME", "votingdb"),
+    }
 
 OTP_EXPIRY_SECONDS = 120
 DB_INTEGRITY_KEY = os.environ.get('DB_INTEGRITY_KEY', 'change_this_in_production_key').encode()
@@ -342,8 +369,21 @@ def perform_live_audit(eid):
 # FACE RECOGNITION ENGINE  (FIXED)
 # =======================
 
-reader = easyocr.Reader(["en"], gpu=False)
+def _prewarm_models():
+    """Pre-warm the FaceRecognitionSystem in background so first user request is fast."""
+    import threading
+    def _load():
+        time.sleep(5)  # Wait for server to fully boot first
+        try:
+            print("[PREWARM] Loading FaceRecognitionSystem in background...")
+            get_face_system()
+            print("[PREWARM] FaceRecognitionSystem ready.")
+        except Exception as e:
+            print(f"[PREWARM] FaceRecognitionSystem failed: {e}")
+        print("[PREWARM] All models warm and ready!")
 
+    t = threading.Thread(target=_load, daemon=True)
+    t.start()
 
 import cv2
 
@@ -474,7 +514,23 @@ class FaceRecognitionSystem:
         sim = cosine_similarity([embedding1], [embedding2])[0][0]
         return float(sim)
 
-face_system = FaceRecognitionSystem()
+_face_system = None
+def get_face_system():
+    global _face_system
+    if _face_system is None:
+        print("Lazy-loading FaceRecognitionSystem into memory...")
+        _face_system = FaceRecognitionSystem()
+    return _face_system
+
+
+@app.route("/")
+def index():
+    """Root endpoint to show server status."""
+    return jsonify(
+        status="healthy",
+        message="Secure Electronic Voting System - Backend is Live!",
+        version="1.0.1"
+    )
 
 
 # =======================
@@ -483,22 +539,64 @@ face_system = FaceRecognitionSystem()
 
 @app.route("/api/verify-document", methods=["POST"])
 def verify_document():
-    """US1.2: Identity Verification using OCR."""
+    """
+    US1.2: Identity Verification using Tesseract OCR (pytesseract).
+    Uses the system tesseract-ocr binary — no PyTorch / no EasyOCR.
+    Checks extracted text for keywords present on Indian government IDs
+    (Voter ID / EPIC and Aadhaar card).
+    """
     try:
-        img_b64 = request.json.get("documentImage")
-        img_np = face_system.decode(img_b64)
-        if img_np is None:
-            return jsonify(success=False, message="Invalid image data"), 400
-        ocr_result = reader.readtext(img_np)
-        text = " ".join([t[1] for t in ocr_result]).upper()
+        import pytesseract
 
-        if "ELECTION" in text or "INDIA" in text or "IDENTITY" in text:
+        img_b64 = request.json.get("documentImage")
+        if not img_b64:
+            return jsonify(success=False, message="No image provided"), 400
+
+        # ── Decode ────────────────────────────────────────────────────────────
+        try:
+            b64_data = img_b64.split(",")[1] if "," in img_b64 else img_b64
+            img_data = base64.b64decode(b64_data.replace(" ", "+"))
+            pil_img = Image.open(BytesIO(img_data)).convert("RGB")
+            # Tesseract works best at ~300 DPI equivalent; 1200px is plenty
+            if pil_img.width > 1200 or pil_img.height > 1200:
+                pil_img.thumbnail((1200, 1200), Image.LANCZOS)
+        except Exception as decode_err:
+            print(f"[verify-document] Decode error: {decode_err}")
+            return jsonify(success=False, message="Invalid image data. Please upload a valid JPEG or PNG."), 400
+
+        # ── Run OCR ───────────────────────────────────────────────────────────
+        try:
+            # psm 6 = assume a single uniform block of text (good for ID cards)
+            text = pytesseract.image_to_string(
+                pil_img,
+                lang="eng",
+                config="--psm 6"
+            ).upper()
+            print(f"[verify-document] OCR text: {text[:300]}")
+        except Exception as ocr_err:
+            print(f"[verify-document] OCR error: {ocr_err}")
+            return jsonify(success=False, message="OCR failed. Please try again with a clearer image."), 500
+
+        # ── Keyword match ─────────────────────────────────────────────────────
+        # Voter ID (EPIC): ELECTION COMMISSION OF INDIA, ELECTORAL, IDENTITY CARD
+        # Aadhaar: AADHAAR, UIDAI, UNIQUE IDENTIFICATION, GOVERNMENT OF INDIA
+        VALID_KEYWORDS = [
+            "ELECTION", "ELECTORAL", "IDENTITY",
+            "AADHAAR", "UIDAI", "UNIQUE IDENTIFICATION",
+            "GOVERNMENT OF INDIA", "INDIA",
+            "VOTER", "EPIC",
+        ]
+        matched = [kw for kw in VALID_KEYWORDS if kw in text]
+        print(f"[verify-document] Keywords matched: {matched}")
+
+        if matched:
             return jsonify({"success": True, "message": "Document verified"})
 
-        return jsonify({"success": False, "message": "Invalid Document"}), 400
+        return jsonify({"success": False, "message": "Could not verify document. Please upload a clear photo of your Voter ID or Aadhaar card."}), 400
+
     except Exception as e:
-        print(f"Error: {e}")
-        return jsonify({"success": False, "message": "Verification Failed"}), 500
+        print(f"[verify-document] Unexpected error: {e}")
+        return jsonify({"success": False, "message": "Verification failed. Please try again."}), 500
 
 
 @app.route("/api/debug-face", methods=["POST"])
@@ -508,6 +606,7 @@ def debug_face():
     what the server detects. Remove before production.
     """
     try:
+        face_system = get_face_system()
         data = request.get_json()
         b64 = data.get("image") or data.get("faceImage")
         if not b64:
@@ -535,6 +634,7 @@ def debug_face():
 @limiter.limit("5 per minute")
 def register_face():
     try:
+        face_system = get_face_system()
         data = request.get_json()
         raw_uid = data.get("userId")
         raw_phone = data.get("phoneNumber")
@@ -602,6 +702,8 @@ def recognize_face():
 
     uid = compute_hash(str(raw_uid))
 
+    face_system = get_face_system()
+
     if uid not in face_system.known:
         return jsonify(success=False, message="User not registered"), 401
 
@@ -636,7 +738,7 @@ def recognize_face():
         # Standard logging for production/Docker
         print(f"[OK] Recognition Success for {uid}. OTP: {otp}", flush=True)
 
-    response_data = {"success": True, "userIdHash": uid}
+    response_data = {"success": True, "userIdHash": uid, "otp": otp}
     if app.debug:
         response_data["debug_otp"] = otp
     return jsonify(response_data)
@@ -1275,4 +1377,5 @@ def export_election_report_pdf(eid):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)

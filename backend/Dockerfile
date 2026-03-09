@@ -3,7 +3,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install runtime libraries needed by OpenCV, torch, etc.
+# Install runtime libraries needed by OpenCV + Tesseract OCR
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libsm6 \
@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     libopenblas-dev \
     liblapack-dev \
+    tesseract-ocr \
+    tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for caching
@@ -20,8 +22,7 @@ COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt \
-    --extra-index-url https://download.pytorch.org/whl/cpu
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy project files
 COPY . .

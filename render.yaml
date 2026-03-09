@@ -1,0 +1,63 @@
+databases:
+  - name: votingdb
+    databaseName: votingdb
+    user: voting
+    plan: free
+
+services:
+  # ─────────────────────────────────────────────
+  # 1. Flask Backend (Face Recognition, OTP, Auth)
+  # ─────────────────────────────────────────────
+  - type: web
+    name: flask-backend
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
+    plan: free
+    branch: main
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: votingdb
+          property: connectionString
+      - key: JWT_SECRET
+        sync: false        # Set manually in Render dashboard
+      - key: DB_INTEGRITY_KEY
+        sync: false        # Set manually in Render dashboard
+      - key: FLASK_ENV
+        value: production
+      - key: INTERNAL_VOTING_CORE_URL
+        fromService:
+          name: voting-core
+          type: web
+          property: hostport
+
+  # ─────────────────────────────────────────────
+  # 2. Voting Core (Elections, Votes, Admin)
+  # ─────────────────────────────────────────────
+  - type: web
+    name: voting-core
+    runtime: node
+    rootDir: voting-core
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: node dist/server.js
+    plan: free
+    branch: main
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: votingdb
+          property: connectionString
+      - key: JWT_SECRET
+        sync: false        # MUST match flask-backend value exactly
+      - key: RECEIPT_SALT
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: DB_INTEGRITY_KEY
+        sync: false
+      - key: NODE_ENV
+        value: production

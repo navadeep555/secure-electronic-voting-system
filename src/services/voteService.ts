@@ -12,8 +12,8 @@ export const castSecureVote = async (
   candidate: string,
   pin: string
 ) => {
-  // Use environment variables for URLs in production
-  const API_URL = "http://localhost:5002/api/votes/cast-vote";
+  // Use relative path so Vercel can rewrite it to the real backend
+  const API_URL = "/api/votes/cast-vote";
 
   const token = localStorage.getItem("voterToken");
 

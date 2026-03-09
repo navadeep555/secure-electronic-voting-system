@@ -114,8 +114,11 @@ export async function checkFaceServerHealth() {
   }
 }
 
+import Tesseract from 'tesseract.js';
+
 /**
- * Verify a Voter ID document via OCR
+ * Verify a Voter ID or Aadhaar document via local OCR (frontend only)
+ * Eliminates backend 502 memory issues.
  */
 export async function verifyDocument(
   documentImage: string,
@@ -123,27 +126,42 @@ export async function verifyDocument(
   dob: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const response = await fetch(`${FACE_API_URL}/verify-document`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        documentImage,
-        fullName: name,
-        dateOfBirth: dob,
-      }),
-    });
+    console.log("🔍 Starting local OCR verification...");
 
-    const result = await response.json();
-    if (!response.ok) {
-      throw new Error(result.message || "Verification failed");
+    // Tesseract.js recognizes base64 images directly
+    const result = await Tesseract.recognize(
+      documentImage,
+      'eng',
+      { logger: m => console.log(m) } // Optional: logs progress to console
+    );
+
+    const text = result.data.text.toUpperCase();
+    console.log("📝 Extracted OCR Text:", text.substring(0, 200) + "...");
+
+    // Keywords for Voter ID (EPIC) and Aadhaar card
+    const VALID_KEYWORDS = [
+      "ELECTION", "ELECTORAL", "IDENTITY", "VOTER", "EPIC",
+      "AADHAAR", "UIDAI", "UNIQUE IDENTIFICATION", "GOVERNMENT"
+    ];
+
+    const matched = VALID_KEYWORDS.some(kw => text.includes(kw));
+
+    if (matched) {
+      console.log("✅ Document verified successfully.");
+      return { success: true, message: "Document verified" };
     }
 
-    return result;
-  } catch (error) {
-    console.error("❌ Verification error:", error);
+    console.warn("❌ Document verification failed - keywords not found.");
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Unknown error",
+      message: "Could not verify document. Ensure it is a valid Voter ID or Aadhaar card."
+    };
+
+  } catch (error) {
+    console.error("❌ OCR processing error:", error);
+    return {
+      success: false,
+      message: "OCR processing failed. Please try a clearer image.",
     };
   }
 }
