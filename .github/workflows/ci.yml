@@ -243,10 +243,19 @@ jobs:
 
     steps:
       - name: Trigger Render deploy (Flask backend + voting-core)
+        env:
+          RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
+          if [ -z "$RENDER_HOOK" ]; then
+            echo "WARNING: RENDER_DEPLOY_HOOK_URL secret is not set."
+            echo "Skipping automatic Render deployment trigger."
+            echo "To enable, add your Render Deploy Hook URL to GitHub Secrets."
+            exit 0
+          fi
+          
           echo "Triggering Render backend deployment..."
           curl -s --fail-with-body \
-            -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" \
+            -X POST "$RENDER_HOOK" \
             -o /tmp/render_response.json
           echo "Render API response:"
           cat /tmp/render_response.json
@@ -265,10 +274,19 @@ jobs:
 
     steps:
       - name: Trigger Vercel deploy (React frontend)
+        env:
+          VERCEL_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
         run: |
+          if [ -z "$VERCEL_HOOK" ]; then
+            echo "WARNING: VERCEL_DEPLOY_HOOK_URL secret is not set."
+            echo "Skipping automatic Vercel deployment trigger."
+            echo "To enable, add your Vercel Deploy Hook URL to GitHub Secrets."
+            exit 0
+          fi
+          
           echo "Triggering Vercel frontend deployment..."
           curl -s --fail-with-body \
-            -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}" \
+            -X POST "$VERCEL_HOOK" \
             -o /tmp/vercel_response.json
           echo "Vercel API response:"
           cat /tmp/vercel_response.json
