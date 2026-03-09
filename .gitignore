@@ -1,41 +1,48 @@
-# Node modules
+# ============================
+# Secure Electronic Voting System – .gitignore
+# Stack: React/Vite + Flask + Node.js (TypeScript) + PostgreSQL
+# ============================
+
+# ── Environment variables (NEVER commit secrets) ─────────────
+.env
+.env.*
+!.env.example
+
+# ── Node.js (Frontend + voting-core) ─────────────────────────
 node_modules/
 dist/
 build/
-.env
 
-# Database files
-voting_system.db
-*.db
-*.sqlite
-*.sqlite3
-
-# Python
+# ── Python (Flask backend) ────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
+.venv/
 venv/
 env/
-.venv/
 *.whl
 *.log
+pip_error.log
 
-# Project specific (biometric data)
+# ── Biometric data (SENSITIVE – never commit raw face data) ──
 face_data/
 encodings/
 
-# OS / Editor
+# ── Database backups & dumps ──────────────────────────────────
+backups/
+*.sql
+
+# ── OS / Editor artifacts ─────────────────────────────────────
 .DS_Store
+Thumbs.db
 .vscode/
 
-# Scripts (optional)
-fix_env.sh
-
-# SSL Certificates - NEVER commit private keys
+# ── SSL Certificates ─────────────────────────────────────────
 devops/ssl/certs/*.key
 devops/ssl/certs/*.csr
 devops/ssl/certs/ca.*
 
-# Temporary / scratch files
+# ── Temporary scratch files ───────────────────────────────────
 app1.py
 test1.py
+fix_env.sh
