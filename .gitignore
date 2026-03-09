@@ -9,6 +9,8 @@ voting_system.db
 *.db
 *.sqlite
 *.sqlite3
+backups/
+*.sql
 
 # Python
 __pycache__/

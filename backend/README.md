@@ -1,269 +1,126 @@
-# Face Recognition Backend
+# Secure Electronic Voting System - Backend
 
-This is the Python backend for facial recognition using `face_recognition` library with Flask. It handles:
+This is the core backend for the Secure Electronic Voting System. It provides biometric facial recognition, secure OTP-based authentication, integrated security monitoring, and robust data recovery mechanisms.
 
-1. **Face Training**: Takes 4 biometric images and creates unique face encodings
-2. **Face Encoding Storage**: Stores face embeddings in a pickle file database
-3. **Face Recognition**: Recognizes users from single face images in real-time
+## 🚀 System Architecture
 
-## Features
+- **Web Framework**: Flask (Python 3.11)
+- **Biometric Engine**: `Face Recognition` (dlib-based)
+- **Primary Database**: PostgreSQL (Hosted on Render)
+- **Face Encoding Storage**: Serialized vector storage (`face_encodings.pkl`)
+- **Deployment**: Dockerized services for consistent environments.
 
-- ✅ Real-time face detection using dlib's CNN model
-- ✅ Face encoding generation (128-dimensional face embeddings)
-- ✅ Persistent storage of face encodings
-- ✅ REST API for registration and recognition
-- ✅ CORS enabled for cross-origin requests
-- ✅ Base64 image support
-- ✅ Configurable tolerance for matching accuracy
+## ✨ Features
 
-## Setup
+- **✅ Biometric Lifecycle**: Secure registration (4 stages) and authentication.
+- **✅ Hybrid Data Storage**: Relational data in PostgreSQL; biometric vectors in optimized files.
+- **✅ Security Monitoring (US6.4)**: Real-time detection of brute-force and anomalies.
+- **✅ Backup & Recovery (US6.5)**: Automated and manual SQL-based snapshots.
+- **✅ Secure Transmission (US6.3)**: Enforced TLS/SSL across all cloud endpoints.
+
+---
+
+## 🛠️ Setup & Installation
+
+The recommended way to run the backend is using **Docker Compose**.
 
 ### Prerequisites
+- Docker & Docker Desktop (for Windows)
+- `.env` file with Render PostgreSQL connection string
 
-- Python 3.8+
-- macOS/Linux (Windows requires additional setup for dlib)
-
-### Installation
-
+### Running with Docker (Recommended)
 ```bash
-# 1. Navigate to backend directory
+# 1. Build the images
+docker-compose build flask-backend
+
+# 2. Start the services
+docker-compose up -d
+```
+
+### Manual Setup (Development)
+```bash
 cd backend
-
-# 2. Make setup script executable
-chmod +x setup.sh
-
-# 3. Run setup script
-./setup.sh
-
-# 4. Activate virtual environment
+python -m venv venv
+# Windows:
+.\venv\Scripts\activate
+# Linux/macOS:
 source venv/bin/activate
 
-# 5. Start the server
+pip install -r requirements.txt
 python app.py
 ```
 
-## Usage
+---
 
-### 1. Register a User (Training Phase)
+## 🔐 API Documentation
 
-```bash
-curl -X POST http://localhost:5000/api/register-face \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userId": "123456789012",
-    "faceImages": [
-      "data:image/jpeg;base64,/9j/4AAQSkZJRg...",
-      "data:image/jpeg;base64,/9j/4AAQSkZJRg...",
-      "data:image/jpeg;base64,/9j/4AAQSkZJRg...",
-      "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
-    ]
-  }'
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "✅ User registered successfully with 4 valid face images",
-  "valid_faces": 4,
-  "total_stages": 4
-}
-```
-
-### 2. Recognize a User (Authentication Phase)
-
-```bash
-curl -X POST http://localhost:5000/api/recognize-face \
-  -H "Content-Type: application/json" \
-  -d '{
-    "faceImage": "data:image/jpeg;base64,/9j/4AAQSkZJRg...",
-    "tolerance": 0.6
-  }'
-```
-
-**Response (Match):**
-```json
-{
-  "success": true,
-  "message": "✅ Face matched! Distance: 0.4521",
-  "matched_user": "123456789012",
-  "distance": 0.4521,
-  "tolerance": 0.6
-}
-```
-
-**Response (No Match):**
-```json
-{
-  "success": false,
-  "message": "❌ Face not recognized. Distance: 0.7234",
-  "matched_user": null,
-  "distance": 0.7234,
-  "tolerance": 0.6
-}
-```
-
-### 3. Get Registered Users
-
-```bash
-curl http://localhost:5000/api/users
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "total_users": 5,
-  "users": [
-    {
-      "userId": "123456789012",
-      "encodingsCount": 4
-    }
-  ]
-}
-```
-
-### 4. Health Check
-
-```bash
-curl http://localhost:5000/api/health
-```
-
-**Response:**
-```json
-{
-  "status": "✅ Face Recognition Server is Running",
-  "registered_users": 1,
-  "timestamp": "2025-12-24T19:30:45.123456"
-}
-```
-
-## How It Works
-
-### Face Encoding
-- Takes a face image and extracts a 128-dimensional embedding
-- Uses dlib's CNN-based face detector and landmark detection
-- Creates a unique "face fingerprint" for each person
-
-### Registration (Training)
-1. Receives 4 biometric images (front, left, right, up angles)
-2. Detects faces in each image
-3. Generates face encodings for each valid face
-4. Stores encodings in `encodings/face_encodings.pkl`
-5. Requires minimum 2 valid face images
-
-### Recognition (Authentication)
-1. Receives a single test image
-2. Generates face encoding from test image
-3. Compares against all stored encodings
-4. Uses Euclidean distance to find closest match
-5. Returns match if distance < tolerance (default 0.6)
-
-### Distance Tolerance Guide
-- **0.4** - Very strict (high false negatives)
-- **0.5** - Strict (recommended for high security)
-- **0.6** - Normal (default, good balance)
-- **0.7** - Lenient (high false positives)
-
-## File Structure
-
-```
-backend/
-├── app.py                 # Main Flask application
-├── requirements.txt       # Python dependencies
-├── setup.sh              # Setup script
-├── README.md             # This file
-├── face_data/            # Stores captured face images (optional)
-├── encodings/            # Stores face encodings
-│   └── face_encodings.pkl  # Serialized face encodings database
-└── venv/                 # Virtual environment (created during setup)
-```
-
-## API Endpoints Summary
+### 1. Registration & Authentication
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | POST | `/api/register-face` | Register user with 4 face images |
-| POST | `/api/recognize-face` | Recognize user from single image |
-| GET | `/api/users` | List all registered users |
-| GET | `/api/health` | Server health check |
+| POST | `/api/recognize-face` | Verify face biometric identity |
+| POST | `/api/verify-otp` | Verify 2FA/OTP code (Requires token) |
 
-## Troubleshooting
+### 2. Admin & System
 
-### "No face found in image"
-- Ensure the image has a clear, front-facing face
-- Check lighting conditions
-- Face should be at least 50x50 pixels
-- Try different angles
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/health` | Check backend & DB status |
+| POST | `/api/admin/backup` | Trigger manual DB snapshot (Header token required) |
+| GET | `/api/users` | List registered voter handles |
 
-### "Could not encode face"
-- dlib failed to detect face landmarks
-- Try with different image angles
-- Improve image lighting
+---
 
-### "No registered users in database"
-- First register users using `/api/register-face`
-- Check that `encodings/face_encodings.pkl` exists
+## 🛡️ Security Implementation (US 6.4)
 
-### Connection refused
-- Ensure backend is running: `python app.py`
-- Check port 5000 is not in use: `lsof -i :5000`
-- Try different port in app.py: `app.run(port=5001)`
+The system automatically monitors for security-relevant events:
+- **Brute Force Detection**: Monitoring of repeated failed authentication attempts.
+- **Access Violation Alerts**: Real-time logging of unauthorized API access attempts.
+- **Anomaly Detection**: Logging of suspicious activity patterns in `system_logs`.
 
-### Import errors
-- Activate virtual environment: `source venv/bin/activate`
-- Install dependencies: `pip install -r requirements.txt`
-
-## Advanced Configuration
-
-### Changing Port
-Edit `app.py`:
-```python
-if __name__ == "__main__":
-    app.run(debug=True, port=5000)  # Change 5000 to desired port
+To view security alerts:
+```sql
+SELECT * FROM system_logs WHERE log_level = 'CRITICAL';
 ```
 
-### Changing Tolerance
-Pass custom tolerance in recognition request:
-```json
-{
-  "faceImage": "...",
-  "tolerance": 0.5
-}
+---
+
+## 💾 Backup & Recovery (US 6.5)
+
+### Manual Backup via API
+Ensure you include your admin JWT token in the header:
+```bash
+curl -X POST http://localhost:5000/api/admin/backup \
+     -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
 ```
 
-### Disabling Debug Mode
-Edit `app.py`:
-```python
-app.run(debug=False, port=5000)  # Set debug=False for production
+### Manual Backup via Container
+You can bypass the API and run a direct dump from inside the container:
+```bash
+docker exec -it voting-flask-api bash /app/backup_database.sh
 ```
 
-## Security Considerations
+### Restoration
+To restore a specific snapshot to the Render database:
+```bash
+docker exec -it voting-flask-api bash /app/restore_database.sh /app/backups/YOUR_FILE.sql
+```
 
-⚠️ **Important for Production:**
+---
 
-1. **Database Security**: Encrypt `encodings/face_encodings.pkl`
-2. **API Authentication**: Add JWT tokens
-3. **Rate Limiting**: Implement rate limiting on endpoints
-4. **HTTPS**: Use SSL/TLS certificates
-5. **Input Validation**: Validate base64 image sizes
-6. **Data Privacy**: Comply with GDPR/data protection laws
-7. **Liveness Detection**: Add anti-spoofing measures
-8. **Backup**: Regular backup of face encodings database
+## 📁 File Structure
 
-## Performance Tips
+```
+backend/
+├── app.py                 # Core API & Routing
+├── auth.py                # Security & JWT logic
+├── security_monitor.py    # US 6.4 Monitoring logic
+├── Dockerfile             # Production container config
+├── encodings/             # Face vector storage
+├── backups/               # Database snapshots
+└── logs/                  # Application runtime logs
+```
 
-- Face detection is CPU-intensive
-- Consider using GPU (CUDA) for better performance
-- Batch processing multiple recognitions
-- Cache frequently used encodings
-- Use smaller images (1280x720) instead of high-res
-- Implement request queuing for high load
-
-## License
-
-This backend is part of SecureVote Identity system.
-
-## Support
-
-For issues or questions, refer to the main project documentation.
+## ⚖️ License
+This system is part of the Secure Electronic Voting System project. Unauthorized reproduction is strictly prohibited.
