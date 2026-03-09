@@ -30,7 +30,7 @@ jobs:
   # JOB 1 – Python Backend: Lint + Test
   # ════════════════════════════════════════════════════════════
   lint-backend:
-    name: 🐍 Python – Lint & Test (Flask)
+    name: Python – Lint & Test (Flask)
     runs-on: ubuntu-latest
 
     steps:
@@ -67,7 +67,7 @@ jobs:
             --statistics \
             --max-line-length=200 \
             --exclude=.venv,venv,__pycache__,encodings,backups,chk_db.py
-          echo "✅ Flake8 passed – no critical errors found"
+          echo "Flake8 passed – no critical errors found"
 
       # pytest: Run unit tests only. Exclude test_monitoring.py — it is an
       # integration test that requires a live Flask server on localhost:5000.
@@ -84,14 +84,14 @@ jobs:
               --ignore=.venv --ignore=venv \
               --ignore=test_monitoring.py
           else
-            echo "⚠️ No unit test files found in backend/. Skipping pytest."
+            echo "No unit test files found in backend/. Skipping pytest."
           fi
 
   # ════════════════════════════════════════════════════════════
   # JOB 2 – Node.js Voting Core: Build + Type Check
   # ════════════════════════════════════════════════════════════
   build-voting-core:
-    name: 🟢 Node.js – Build & TypeCheck (voting-core)
+    name: Node.js – Build & TypeCheck (voting-core)
     runs-on: ubuntu-latest
 
     steps:
@@ -114,19 +114,19 @@ jobs:
         run: |
           echo "Compiling TypeScript..."
           npx tsc --noEmit
-          echo "✅ TypeScript type-check passed"
+          echo "TypeScript type-check passed"
 
       - name: Build voting-core (tsc output)
         working-directory: voting-core
         run: |
           npm run build
-          echo "✅ voting-core build successful"
+          echo "voting-core build successful"
 
   # ════════════════════════════════════════════════════════════
   # JOB 3 – React Frontend: Lint + Build
   # ════════════════════════════════════════════════════════════
   build-frontend:
-    name: ⚛️ React – Lint & Build (Vite)
+    name: React – Lint & Build (Vite)
     runs-on: ubuntu-latest
 
     steps:
@@ -148,13 +148,13 @@ jobs:
       - name: Run ESLint (warnings allowed)
         run: |
           echo "Running ESLint..."
-          npm run lint || echo "⚠️ ESLint reported warnings/errors (non-blocking). Fix before next release."
-          echo "✅ ESLint step complete"
+          npm run lint || echo "ESLint reported warnings/errors (non-blocking). Fix before next release."
+          echo "ESLint step complete"
 
       - name: Build production bundle (Vite)
         run: |
           npm run build
-          echo "✅ Frontend production build successful"
+          echo "Frontend production build successful"
         env:
           # These are build-time env vars for Vite (VITE_ prefix)
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || 'https://placeholder.render.com' }}
@@ -163,7 +163,7 @@ jobs:
   # JOB 4 – Docker: Validate Flask Backend Image Builds
   # ════════════════════════════════════════════════════════════
   validate-docker:
-    name: 🐳 Docker – Build Smoke Test (Flask)
+    name: Docker – Build Smoke Test (Flask)
     runs-on: ubuntu-latest
     # Only run on pushes (not every PR comment) to save build time
     if: github.event_name == 'push' || github.event.pull_request.draft == false
@@ -188,13 +188,13 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Docker build smoke test passed
-        run: echo "✅ Flask Docker image builds successfully"
+        run: echo "Flask Docker image builds successfully"
 
   # ════════════════════════════════════════════════════════════
   # JOB 5 – Environment Variables: Verify Required Secrets
   # ════════════════════════════════════════════════════════════
   check-env-vars:
-    name: 🔑 Verify Required Environment Variables
+    name: Verify Required Environment Variables
     runs-on: ubuntu-latest
 
     steps:
@@ -207,25 +207,70 @@ jobs:
           MISSING=0
 
           if [ -z "$DATABASE_URL_CHECK" ]; then
-            echo "⚠️  WARNING: DATABASE_URL secret is not set in GitHub Secrets."
-            echo "   → Go to: Settings → Secrets → Actions → New repository secret"
+            echo "WARNING: DATABASE_URL secret is not set in GitHub Secrets."
+            echo "   -> Go to: Settings -> Secrets -> Actions -> New repository secret"
             MISSING=1
           else
-            echo "✅ DATABASE_URL is configured"
+            echo "DATABASE_URL is configured"
           fi
 
           if [ -z "$JWT_SECRET_CHECK" ]; then
-            echo "⚠️  WARNING: JWT_SECRET secret is not set in GitHub Secrets."
+            echo "WARNING: JWT_SECRET secret is not set in GitHub Secrets."
             MISSING=1
           else
-            echo "✅ JWT_SECRET is configured"
+            echo "JWT_SECRET is configured"
           fi
 
           if [ $MISSING -eq 1 ]; then
             echo ""
-            echo "⚠️  Some secrets are missing. CI will still pass, but configure them"
+            echo "Some secrets are missing. CI will still pass, but configure them"
             echo "   before deploying to production."
           else
             echo ""
-            echo "✅ All required secrets are configured for CI."
+            echo "All required secrets are configured for CI."
           fi
+
+  # ════════════════════════════════════════════════════════════
+  # JOB 6 – Deploy Backend to Render
+  # Runs ONLY after all CI jobs pass, and ONLY on push to main
+  # (not on pull requests — we never deploy unmerged code)
+  # ════════════════════════════════════════════════════════════
+  deploy-backend:
+    name: Deploy Backend to Render
+    runs-on: ubuntu-latest
+    needs: [lint-backend, build-voting-core, build-frontend, validate-docker, check-env-vars]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Trigger Render deploy (Flask backend + voting-core)
+        run: |
+          echo "Triggering Render backend deployment..."
+          curl -s --fail-with-body \
+            -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" \
+            -o /tmp/render_response.json
+          echo "Render API response:"
+          cat /tmp/render_response.json
+          echo ""
+          echo "Render deploy triggered successfully"
+
+  # ════════════════════════════════════════════════════════════
+  # JOB 7 – Deploy Frontend to Vercel
+  # Runs in parallel with deploy-backend after all CI jobs pass
+  # ════════════════════════════════════════════════════════════
+  deploy-frontend:
+    name: Deploy Frontend to Vercel
+    runs-on: ubuntu-latest
+    needs: [lint-backend, build-voting-core, build-frontend, validate-docker, check-env-vars]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Trigger Vercel deploy (React frontend)
+        run: |
+          echo "Triggering Vercel frontend deployment..."
+          curl -s --fail-with-body \
+            -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}" \
+            -o /tmp/vercel_response.json
+          echo "Vercel API response:"
+          cat /tmp/vercel_response.json
+          echo ""
+          echo "Vercel deploy triggered successfully"
