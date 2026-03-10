@@ -13,7 +13,7 @@ export const castSecureVote = async (
   pin: string
 ) => {
   // Use relative path so Vercel can rewrite it to the real backend
-  const API_URL = "/api/votes/cast-vote";
+  const API_URL = "/api/voter/cast-vote";
 
   const token = localStorage.getItem("voterToken");
 
