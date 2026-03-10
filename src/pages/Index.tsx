@@ -28,11 +28,13 @@ const features = [
   },
 ];
 
-const stats = [
-  { value: "100%", label: "Secure & Verified" },
-  { value: "250M+", label: "Eligible Voters" },
-  { value: "0", label: "Fraud Incidents" },
-  { value: "24/7", label: "System Monitoring" },
+import { Database, Fingerprint, FileSearch } from "lucide-react";
+
+const capabilities = [
+  { icon: Lock, title: "End-to-End Encryption", description: "Securing ballot integrity" },
+  { icon: Database, title: "Immutable Ledger", description: "Tamper-proof record keeping" },
+  { icon: Fingerprint, title: "Zero-Knowledge Proofs", description: "Verifying eligibility privately" },
+  { icon: FileSearch, title: "Publicly Auditable", description: "Open mathematical verification" },
 ];
 
 export default function Index() {
@@ -104,16 +106,23 @@ export default function Index() {
             </div>
           </section>
 
-          {/* STATS STRIP */}
-          <section className="border-y border-neutral-100 bg-neutral-50">
-            <div className="container mx-auto px-6 max-w-7xl">
-              <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-neutral-200">
-                {stats.map((stat, i) => (
-                  <div key={i} className="py-8 text-center px-4">
-                    <p className="text-3xl md:text-4xl font-display font-bold text-primary-800 mb-1">{stat.value}</p>
-                    <p className="text-xs font-bold uppercase tracking-widest text-neutral-500">{stat.label}</p>
-                  </div>
-                ))}
+          {/* CAPABILITIES STRIP - TEXT & GLOW FOCUSED */}
+          <section className="relative z-20 -mt-10 mb-16 px-6">
+            <div className="container mx-auto max-w-7xl">
+              <div className="bg-white/80 backdrop-blur-md rounded-full px-10 py-6 shadow-[0_8px_30px_rgb(128,0,32,0.06)] border border-primary-50">
+                <div className="flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-4 divide-y lg:divide-y-0 lg:divide-x divide-primary-100/50">
+                  {capabilities.map((cap, i) => (
+                    <div key={i} className="flex items-center gap-4 w-full lg:w-1/4 pt-6 lg:pt-0 lg:px-6 first:pt-0 first:lg:pl-0 last:lg:pr-0 group cursor-default">
+                      <div className="flex-shrink-0 w-12 h-12 rounded-full bg-primary-50 flex items-center justify-center text-primary-700 group-hover:bg-primary-700 group-hover:text-white transition-colors duration-300">
+                        <cap.icon className="h-5 w-5" strokeWidth={1.5} />
+                      </div>
+                      <div className="text-left">
+                        <h3 className="text-sm font-bold text-neutral-900 group-hover:text-primary-800 transition-colors uppercase tracking-wide">{cap.title}</h3>
+                        <p className="text-xs text-neutral-500 mt-0.5">{cap.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </section>

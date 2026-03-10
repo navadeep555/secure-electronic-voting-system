@@ -19,6 +19,16 @@ import NotFound from "./pages/NotFound";
 import HowItWorks from "./pages/HowItWorks";
 import VoteElection from "@/pages/voter/VoteElection";
 
+// --- Footer Pages Imports ---
+import SecurityInfo from "./pages/info/Security";
+import AccessibilityInfo from "./pages/info/Accessibility";
+import FAQ from "./pages/info/FAQ";
+import PrivacyPolicy from "./pages/info/PrivacyPolicy";
+import TermsOfService from "./pages/info/Terms";
+import CookiePolicy from "./pages/info/Cookies";
+import DataProtection from "./pages/info/DataProtection";
+import { ElectionsPortal } from "./pages/ElectionsPortal";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -52,6 +62,20 @@ const App = () => (
 
           {/* Publicly published results */}
           <Route path="/results/:eid" element={<PublicResults />} />
+
+          {/* PUBLIC ELECTIONS PORTAL */}
+          <Route path="/elections" element={<ElectionsPortal />} />
+          <Route path="/results" element={<ElectionsPortal />} />
+          <Route path="/calendar" element={<ElectionsPortal />} />
+
+          {/* INFO & LEGAL PAGES */}
+          <Route path="/security" element={<SecurityInfo />} />
+          <Route path="/accessibility" element={<AccessibilityInfo />} />
+          <Route path="/faq" element={<FAQ />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/cookies" element={<CookiePolicy />} />
+          <Route path="/data-protection" element={<DataProtection />} />
 
           {/* 404 FALLBACK */}
           <Route path="*" element={<NotFound />} />

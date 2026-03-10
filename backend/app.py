@@ -1338,6 +1338,32 @@ def get_public_audit_trail():
     return jsonify([dict(log) for log in logs])
 
 
+@app.route("/api/public/elections", methods=["GET"])
+def get_public_elections():
+    """Public endpoint to fetch all elections and their statuses for the observer portal."""
+    try:
+        conn = get_db()
+        # Only fetch safe, public-facing columns. Exclude internal hashes or private fields.
+        cur = db_execute(conn, """
+            SELECT election_id, title, description, start_time, end_time, status, results_published
+            FROM elections
+            ORDER BY start_time DESC
+        """)
+        elections = cur.fetchall()
+        
+        # for each election, let's also attach candidate counts since the public portal needs it
+        for e in elections:
+            cur_c = db_execute(conn, "SELECT COUNT(*) as count FROM candidates WHERE election_id = %s", (e['election_id'],))
+            row = cur_c.fetchone()
+            e['candidate_count'] = row['count'] if row else 0
+
+        conn.close()
+        return jsonify(success=True, data=[dict(r) for r in elections]), 200
+    except Exception as e:
+        print(f"[ERROR] server crash fetching public elections: {e}")
+        return jsonify(success=False, message="Internal Server Error"), 500
+
+
 @app.route("/api/voter/verify-receipt", methods=["POST"])
 def verify_receipt():
     """US 2.5: Voter verifies their specific ballot exists and is untampered."""

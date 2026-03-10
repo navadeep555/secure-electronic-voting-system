@@ -8,6 +8,8 @@ import { Shield, Menu, Vote, LayoutDashboard, Lock } from "lucide-react";
 const navigation = [
   { name: "Home", href: "/" },
   { name: "How It Works", href: "/how-it-works" },
+  { name: "FAQ", href: "/faq" },
+  { name: "Security", href: "/security" },
 ];
 
 export function Header() {

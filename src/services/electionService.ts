@@ -13,6 +13,11 @@ const getAuthHeader = () => ({
 
 export const electionService = {
     /**
+     * Fetch all public elections (no auth required)
+     */
+    getPublicElections: () => axios.get(`/api/public/elections`),
+
+    /**
      * Fetch all elections for the dashboard list
      */
     getElections: () => axios.get(`/api/elections`, getAuthHeader()),
