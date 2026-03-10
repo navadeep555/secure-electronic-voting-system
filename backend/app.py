@@ -35,6 +35,7 @@ from flask_cors import CORS
 from PIL import Image
 from io import BytesIO
 from dotenv import load_dotenv
+from cryptography.fernet import Fernet
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
@@ -120,6 +121,29 @@ else:
 
 OTP_EXPIRY_SECONDS = 120
 DB_INTEGRITY_KEY = os.environ.get('DB_INTEGRITY_KEY', 'change_this_in_production_key').encode()
+
+# US 6.1: Fernet Encryption initialization for sensitive data at rest
+_FERNET_SECRET = os.environ.get('FERNET_SECRET')
+if not _FERNET_SECRET:
+    # Generate one for dev if missing. In prod this must be consistent in .env
+    _FERNET_SECRET = Fernet.generate_key().decode()
+    os.environ['FERNET_SECRET'] = _FERNET_SECRET
+
+cipher_suite = Fernet(_FERNET_SECRET.encode())
+
+def encrypt_data(data: str) -> str:
+    if not data: return data
+    return cipher_suite.encrypt(data.encode()).decode()
+
+def decrypt_data(data: str) -> str:
+    if not data: return data
+    try:
+        return cipher_suite.decrypt(data.encode()).decode()
+    except Exception:
+        # Fallback if it wasn't encrypted (e.g. migration)
+        return data
+
+print("[OK] Cryptography keys loaded")
 print("[OK] Flask Secret Loaded")
 
 
@@ -315,6 +339,26 @@ def init_db():
     """)
 
     c.execute("""
+        CREATE OR REPLACE FUNCTION trap_audit_tampering_fn()
+        RETURNS TRIGGER LANGUAGE plpgsql AS $$
+        BEGIN
+            RAISE EXCEPTION 'Security Error: Audit logs are append-only and immutable.';
+        END;
+        $$;
+    """)
+    c.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'trap_audit_tampering'
+            ) THEN
+                CREATE TRIGGER trap_audit_tampering
+                BEFORE UPDATE OR DELETE ON audit_log
+                FOR EACH ROW EXECUTE FUNCTION trap_audit_tampering_fn();
+            END IF;
+        END $$;
+    """)
+
+    c.execute("""
         CREATE TABLE IF NOT EXISTS system_logs (
             log_id SERIAL PRIMARY KEY,
             event_type TEXT,
@@ -328,6 +372,28 @@ def init_db():
     conn.close()
     print("[OK] Database Initialized with Secure Ledger, HMAC signatures, and Audit Triggers")
 
+
+def _start_continuous_monitoring():
+    """US 6.2: Background thread that continuously monitors for data anomalies."""
+    import threading
+    def _monitor():
+        while True:
+            time.sleep(300)  # Check every 5 minutes
+            try:
+                conn = get_db()
+                cur = db_execute(conn, "SELECT election_id FROM elections WHERE status IN ('ACTIVE', 'CLOSED')")
+                elections = [r['election_id'] for r in cur.fetchall()]
+                conn.close()
+                for eid in elections:
+                    perform_live_audit(eid)
+                print(f"[MONITOR] Background audit complete for {len(elections)} elections.")
+            except Exception as e:
+                print(f"[MONITOR] Error during background audit: {e}")
+
+    t = threading.Thread(target=_monitor, daemon=True)
+    t.start()
+
+_start_continuous_monitoring()
 
 init_db()
 
@@ -776,8 +842,9 @@ def recognize_face():
         return jsonify(success=False, message="Face mismatch. Please try again."), 401
 
     otp = str(random.randint(100000, 999999))
+    encrypted_otp = encrypt_data(otp)
     conn = get_db()
-    db_execute(conn, "UPDATE users SET otp=%s, otp_time=%s WHERE user_id_hash=%s", (otp, int(time.time()), uid))
+    db_execute(conn, "UPDATE users SET otp=%s, otp_time=%s WHERE user_id_hash=%s", (encrypted_otp, int(time.time()), uid))
     conn.commit()
     conn.close()
 
@@ -807,7 +874,18 @@ def verify_otp():
     cur = db_execute(conn, "SELECT otp, otp_time, role FROM users WHERE user_id_hash=%s", (uid,))
     row = cur.fetchone()
 
-    if not row or row['otp'] != otp or (time.time() - int(row['otp_time']) > OTP_EXPIRY_SECONDS):
+    if not row:
+        security_monitor.log_system_event(
+            conn, 
+            "OTP_FAILURE", 
+            f"Invalid OTP attempt: User {uid} not found", 
+            source_ip=request.remote_addr
+        )
+        conn.close()
+        return jsonify(success=False, message="Invalid/Expired OTP"), 401
+
+    decrypted_otp = decrypt_data(row['otp'])
+    if decrypted_otp != otp or (time.time() - int(row['otp_time']) > OTP_EXPIRY_SECONDS):
         security_monitor.log_system_event(
             conn, 
             "OTP_FAILURE", 

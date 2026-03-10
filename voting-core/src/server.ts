@@ -69,11 +69,15 @@ app.use("/api/admin", adminRoutes);
 
 const PORT = process.env.PORT || 5002;
 
-initDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`🚀 Voting Core running at http://localhost:${PORT}`);
+if (process.env.NODE_ENV !== "test") {
+  initDB().then(() => {
+    app.listen(PORT, () => {
+      console.log(`🚀 Voting Core running at http://localhost:${PORT}`);
+    });
   });
-});
+}
+
+export default app;
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });
 });
