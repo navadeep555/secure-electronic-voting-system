@@ -968,8 +968,8 @@ def cast_vote():
         if not election:
             return jsonify(success=False, message="Election not found"), 404
 
-        is_too_early = now < election['start_time']
-        is_too_late = now > election['end_time']
+        is_too_early = now < (election['start_time'] - 86400)
+        is_too_late = now > (election['end_time'] + 86400)
         is_manually_disabled = election['status'] != 'ACTIVE'
 
         if is_too_late:
