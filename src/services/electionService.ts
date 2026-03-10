@@ -58,5 +58,11 @@ export const electionService = {
      * Bulk register voter hashes for an election (US3.4)
      */
     registerVotersForElection: (electionId: string, voterHashes: string[]) =>
-        axios.post(`${API_BASE}/register-voters`, { electionId, voterHashes }, getAuthHeader())
+        axios.post(`${API_BASE}/register-voters`, { electionId, voterHashes }, getAuthHeader()),
+
+    /**
+     * Delete an election (Draft mode only)
+     */
+    deleteElection: (electionId: string) =>
+        axios.delete(`${API_BASE}/elections/${electionId}`, getAuthHeader())
 };

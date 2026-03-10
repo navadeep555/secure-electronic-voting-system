@@ -1070,8 +1070,40 @@ def admin_elections_handler():
         d = dict(row)
         d['candidate_count'] = int(d.get('candidate_count', 0))
         data.append(d)
-
     return jsonify(data)
+
+@app.route("/api/admin/elections/<eid>", methods=["DELETE", "OPTIONS"])
+def admin_delete_election(eid):
+    """Delete an election if it is in DRAFT status"""
+    if request.method == "OPTIONS":
+        return "", 200
+
+    conn = get_db()
+    try:
+        cur = db_execute(conn, "SELECT status FROM elections WHERE election_id = %s", (eid,))
+        election = cur.fetchone()
+
+        if not election:
+            return jsonify(success=False, message="Election not found"), 404
+
+        if election['status'] != 'DRAFT':
+            return jsonify(success=False, message="Only DRAFT elections can be deleted. This election is locked."), 400
+
+        # Delete associated dependencies first (Candidates & Voters)
+        db_execute(conn, "DELETE FROM candidates WHERE election_id = %s", (eid,))
+        db_execute(conn, "DELETE FROM election_voters WHERE election_id = %s", (eid,))
+        
+        # Delete election
+        db_execute(conn, "DELETE FROM elections WHERE election_id = %s", (eid,))
+        
+        conn.commit()
+        return jsonify(success=True, message="Election deleted successfully")
+    except Exception as e:
+        conn.rollback()
+        print(f"[ERROR] Deleting Election: {e}")
+        return jsonify(success=False, message=str(e)), 500
+    finally:
+        conn.close()
 
 
 @app.route("/api/admin/setup-election", methods=["POST", "OPTIONS"])
