@@ -16,6 +16,7 @@ import AuditView from "./pages/dashboard/AuditView"; // Added for Epic 5
 import PublicResults from "./pages/PublicResults";
 import AlreadyVoted from "./pages/AlreadyVoted";
 import NotFound from "./pages/NotFound";
+import HowItWorks from "./pages/HowItWorks";
 import VoteElection from "@/pages/voter/VoteElection";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
         <Routes>
           {/* LANDING PAGE */}
           <Route path="/" element={<Index />} />
+          <Route path="/how-it-works" element={<HowItWorks />} />
 
           {/* AUTHENTICATION */}
           <Route path="/login" element={<Login />} />

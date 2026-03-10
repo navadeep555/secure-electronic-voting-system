@@ -158,7 +158,7 @@ export default function AdminDashboard() {
                     Admin Portal
                   </p>
                   <p className="text-[10px] text-neutral-400">
-                    Election Commission
+                    SecureVote Admin
                   </p>
                 </div>
               </div>
@@ -169,8 +169,8 @@ export default function AdminDashboard() {
                   key={item.key}
                   onClick={() => setActiveSection(item.key as any)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm font-medium transition-all ${activeSection === item.key
-                      ? "bg-red-50 text-[#800020] border-l-4 border-[#800020]"
-                      : "text-neutral-500 hover:bg-neutral-50 border-l-4 border-transparent"
+                    ? "bg-red-50 text-[#800020] border-l-4 border-[#800020]"
+                    : "text-neutral-500 hover:bg-neutral-50 border-l-4 border-transparent"
                     }`}
                 >
                   <item.icon className="h-5 w-5" />

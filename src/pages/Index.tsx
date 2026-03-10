@@ -8,8 +8,8 @@ import { motion } from "framer-motion";
 const features = [
   {
     icon: Shield,
-    title: "Military-Grade Encryption",
-    description: "End-to-end cryptographic verification ensures your vote remains immutable and anonymous.",
+    title: "Advanced Cryptographic Protection",
+    description: "End-to-end encryption ensures your vote remains immutable and anonymous throughout the entire process.",
   },
   {
     icon: Smartphone,
@@ -191,7 +191,7 @@ export default function Index() {
                       "The SecureVote system represents a paradigm shift in electoral integrity, combining the accessibility of digital platforms with the recoverability of paper ballots."
                     </p>
                     <p className="font-bold text-white mt-4">
-                      — National Electoral Commission
+                      — SecureVote Research Initiative
                     </p>
                   </div>
                 </div>

@@ -110,7 +110,7 @@ const PublicResults = () => {
           <Lock className="h-8 w-8 text-amber-600" />
         </div>
         <h2 className="text-2xl font-bold text-neutral-900 mb-2">Results Pending</h2>
-        <p className="text-neutral-500 mb-6">The election has ended, but the Commission is currently performing the final cryptographic audit before public release.</p>
+        <p className="text-neutral-500 mb-6">The election has ended, but the team is currently performing the final cryptographic audit before public release.</p>
         <Button variant="outline" onClick={() => navigate(-1)}><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
       </div>
     );

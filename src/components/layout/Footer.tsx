@@ -39,25 +39,25 @@ export function Footer() {
                   SecureVote
                 </span>
                 <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-semibold mt-1">
-                  Electoral Commission
+                  Research Initiative
                 </span>
               </div>
             </Link>
             <p className="text-neutral-400 text-sm max-w-xs mb-8 leading-relaxed">
-              Official digital voting platform authorized by the National Electoral Commission. Ensuring secure, transparent, and verified elections for all eligible citizens.
+              A secure digital voting platform built to demonstrate modern cryptographic voting concepts. Ensuring secure, transparent, and verified elections.
             </p>
             <div className="flex flex-col gap-3 text-sm">
               <div className="flex items-center gap-3 text-neutral-300">
                 <Phone className="h-4 w-4 text-accent-500" />
-                <span>1-800-VOTE-NOW (Official Helpline)</span>
+                <span>+1-800-SECURE-VOTE</span>
               </div>
               <div className="flex items-center gap-3 text-neutral-300">
                 <Mail className="h-4 w-4 text-accent-500" />
-                <span>helpdesk@commission.gov</span>
+                <span>support@securevote.org</span>
               </div>
               <div className="flex items-center gap-3 text-neutral-300">
                 <MapPin className="h-4 w-4 text-accent-500" />
-                <span>Commission HQ, Capital City</span>
+                <span>SecureVote Research Lab, Digital Governance Initiative</span>
               </div>
             </div>
           </div>
@@ -120,13 +120,18 @@ export function Footer() {
 
         {/* Bottom Bar */}
         <div className="mt-16 pt-8 border-t border-neutral-800 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-neutral-500">
-          <p>
-            © {new Date().getFullYear()} National Electoral Commission. All rights reserved. Authorized Government System.
-          </p>
+          <div>
+            <p>
+              © {new Date().getFullYear()} SecureVote. All rights reserved. Research Prototype.
+            </p>
+            <p className="mt-1 text-neutral-600">
+              This platform is a research prototype for demonstrating secure digital voting concepts.
+            </p>
+          </div>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
               <Shield className="h-3 w-3 text-emerald-500" />
-              <span className="text-neutral-400">Military-Grade Encryption</span>
+              <span className="text-neutral-400">Advanced Cryptographic Protection</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>

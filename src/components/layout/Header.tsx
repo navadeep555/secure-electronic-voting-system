@@ -7,9 +7,7 @@ import { Shield, Menu, Vote, LayoutDashboard, Lock } from "lucide-react";
 
 const navigation = [
   { name: "Home", href: "/" },
-  { name: "Elections", href: "/elections" },
   { name: "How It Works", href: "/how-it-works" },
-  { name: "Results", href: "/results" },
 ];
 
 export function Header() {
@@ -35,7 +33,7 @@ export function Header() {
               SCV
             </span>
             <span className="text-[11px] text-neutral-600 uppercase tracking-widest font-semibold mt-1">
-              Secure Vote Commission
+              Secure Vote
             </span>
           </div>
         </Link>
@@ -47,8 +45,8 @@ export function Header() {
               key={item.name}
               to={item.href}
               className={`relative px-1 py-1 text-sm font-bold uppercase tracking-wide transition-colors ${isActive(item.href)
-                  ? "text-primary-700"
-                  : "text-neutral-600 hover:text-primary-700"
+                ? "text-primary-700"
+                : "text-neutral-600 hover:text-primary-700"
                 }`}
             >
               {item.name}
@@ -118,8 +116,8 @@ export function Header() {
                     to={item.href}
                     onClick={() => setIsOpen(false)}
                     className={`px-4 py-3 text-sm font-bold uppercase tracking-wide border-l-2 transition-all ${isActive(item.href)
-                        ? "text-primary-700 border-primary-700 bg-primary-50"
-                        : "text-neutral-600 border-transparent hover:bg-neutral-50"
+                      ? "text-primary-700 border-primary-700 bg-primary-50"
+                      : "text-neutral-600 border-transparent hover:bg-neutral-50"
                       }`}
                   >
                     {item.name}
