@@ -35,6 +35,7 @@ backups/
 # ── OS / Editor artifacts ─────────────────────────────────────
 .DS_Store
 Thumbs.db
+desktop.ini
 .vscode/
 
 # ── SSL Certificates ─────────────────────────────────────────
