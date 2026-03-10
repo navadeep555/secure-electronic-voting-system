@@ -115,6 +115,17 @@ export function AdminElectionsView() {
         return;
       }
 
+      // 3b. Prevent creating elections in the past
+      const todayUnix = Math.floor(new Date().setHours(0, 0, 0, 0) / 1000);
+      if (startUnix < todayUnix) {
+        toast({
+          title: "Invalid Start Date",
+          description: "Start Date cannot be in the past.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // 4. Construct the exact payload expected by the backend
       const payload = {
         title: newElection.title,
@@ -161,8 +172,29 @@ export function AdminElectionsView() {
       await electionService.updateStatus(id, nextStatus);
       toast({ title: `Election status updated to ${nextStatus}` });
       fetchElections();
-    } catch (error) {
-      toast({ title: "Update Failed", variant: "destructive" });
+    } catch (error: any) {
+      toast({
+        title: "Update Failed",
+        description: error.response?.data?.message || "Failed to update status",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    const confirmed = window.confirm("Are you sure you want to delete this election?");
+    if (!confirmed) return;
+
+    try {
+      await electionService.deleteElection(id);
+      toast({ title: "Election Deleted" });
+      fetchElections();
+    } catch (error: any) {
+      toast({
+        title: "Delete Failed",
+        description: error.response?.data?.message || "Could not delete election.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -340,6 +372,7 @@ export function AdminElectionsView() {
                     <DropdownMenuItem
                       className="text-red-600"
                       disabled={election.status === "ACTIVE"}
+                      onClick={() => handleDelete(election.election_id)}
                     >
                       <Trash2 className="h-4 w-4 mr-2" /> Delete
                     </DropdownMenuItem>
