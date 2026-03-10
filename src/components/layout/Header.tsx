@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Shield, Menu, Vote, LayoutDashboard, Lock } from "lucide-react";
+import { Shield, Menu, Vote, LayoutDashboard, Lock, User, LogOut } from "lucide-react";
 
 const navigation = [
   { name: "Home", href: "/" },
@@ -15,8 +15,22 @@ const navigation = [
 export function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const voterToken = localStorage.getItem("voterToken");
+  const adminToken = localStorage.getItem("token");
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleVoterLogout = () => {
+    localStorage.removeItem("voterToken");
+    navigate("/login");
+  };
+
+  const handleAdminLogout = () => {
+    localStorage.removeItem("token");
+    navigate("/admin/login");
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white shadow-sm border-t-[4px] border-t-primary-700 font-sans">
@@ -64,32 +78,62 @@ export function Header() {
 
         {/* Desktop Auth Buttons */}
         <div className="hidden md:flex items-center gap-3">
-          {/* Subtle Admin Portal Link */}
-          <Link to="/admin/login">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="font-semibold text-neutral-700 hover:bg-neutral-100 uppercase text-xs tracking-wider gap-2"
-            >
-              <Lock className="h-3 w-3" />
-              Admin Portal
-            </Button>
-          </Link>
-          <div className="h-6 w-[1px] bg-neutral-200 mx-1" /> {/* Divider */}
-          <Link to="/login">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="font-semibold text-neutral-700 hover:bg-neutral-100 uppercase text-xs tracking-wider"
-            >
-              Login
-            </Button>
-          </Link>
-          <Link to="/register">
-            <Button className="bg-primary-700 hover:bg-primary-800 text-white font-bold uppercase text-xs tracking-wider px-6 rounded-sm shadow-sm transition-all">
-              Register
-            </Button>
-          </Link>
+          {adminToken ? (
+            <>
+              <Link to="/dashboard/admin">
+                <Button variant="ghost" size="sm" className="font-semibold text-neutral-700 hover:bg-neutral-100 uppercase text-xs tracking-wider gap-2">
+                  <LayoutDashboard className="h-3 w-3" />
+                  Admin Dashboard
+                </Button>
+              </Link>
+              <Button onClick={handleAdminLogout} variant="ghost" size="sm" className="font-semibold text-neutral-700 hover:bg-neutral-100 uppercase text-xs tracking-wider gap-2">
+                <LogOut className="h-3 w-3" />
+                Logout
+              </Button>
+            </>
+          ) : voterToken ? (
+            <>
+              <Link to="/dashboard/voter">
+                <Button variant="ghost" size="sm" className="font-semibold text-neutral-700 hover:bg-neutral-100 uppercase text-xs tracking-wider gap-2">
+                  <User className="h-3 w-3" />
+                  User Profile
+                </Button>
+              </Link>
+              <Button onClick={handleVoterLogout} variant="ghost" size="sm" className="font-semibold text-neutral-700 hover:bg-neutral-100 uppercase text-xs tracking-wider gap-2">
+                <LogOut className="h-3 w-3" />
+                Logout
+              </Button>
+            </>
+          ) : (
+            <>
+              {/* Subtle Admin Portal Link */}
+              <Link to="/admin/login">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="font-semibold text-neutral-700 hover:bg-neutral-100 uppercase text-xs tracking-wider gap-2"
+                >
+                  <Lock className="h-3 w-3" />
+                  Admin Portal
+                </Button>
+              </Link>
+              <div className="h-6 w-[1px] bg-neutral-200 mx-1" /> {/* Divider */}
+              <Link to="/login">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="font-semibold text-neutral-700 hover:bg-neutral-100 uppercase text-xs tracking-wider"
+                >
+                  Login
+                </Button>
+              </Link>
+              <Link to="/register">
+                <Button className="bg-primary-700 hover:bg-primary-800 text-white font-bold uppercase text-xs tracking-wider px-6 rounded-sm shadow-sm transition-all">
+                  Register
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile Menu */}
@@ -128,31 +172,61 @@ export function Header() {
               </nav>
 
               <div className="flex flex-col gap-3 pt-4 border-t border-neutral-100">
-                <Link to="/login" onClick={() => setIsOpen(false)}>
-                  <Button
-                    variant="outline"
-                    className="w-full border-neutral-300 font-bold uppercase text-xs py-5"
-                  >
-                    Voter Login
-                  </Button>
-                </Link>
+                {adminToken ? (
+                  <>
+                    <Link to="/dashboard/admin" onClick={() => setIsOpen(false)}>
+                      <Button variant="outline" className="w-full border-neutral-300 font-bold uppercase text-xs py-5 gap-2">
+                        <LayoutDashboard className="h-4 w-4" />
+                        Admin Dashboard
+                      </Button>
+                    </Link>
+                    <Button onClick={() => { setIsOpen(false); handleAdminLogout(); }} variant="ghost" className="w-full text-neutral-500 font-bold uppercase text-xs gap-2 py-5">
+                      <LogOut className="h-4 w-4" />
+                      Logout
+                    </Button>
+                  </>
+                ) : voterToken ? (
+                  <>
+                    <Link to="/dashboard/voter" onClick={() => setIsOpen(false)}>
+                      <Button variant="outline" className="w-full border-neutral-300 font-bold uppercase text-xs py-5 gap-2">
+                        <User className="h-4 w-4" />
+                        User Profile
+                      </Button>
+                    </Link>
+                    <Button onClick={() => { setIsOpen(false); handleVoterLogout(); }} variant="ghost" className="w-full text-neutral-500 font-bold uppercase text-xs gap-2 py-5">
+                      <LogOut className="h-4 w-4" />
+                      Logout
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/login" onClick={() => setIsOpen(false)}>
+                      <Button
+                        variant="outline"
+                        className="w-full border-neutral-300 font-bold uppercase text-xs py-5"
+                      >
+                        Voter Login
+                      </Button>
+                    </Link>
 
-                {/* Admin Option in Mobile Menu */}
-                <Link to="/admin/login" onClick={() => setIsOpen(false)}>
-                  <Button
-                    variant="ghost"
-                    className="w-full text-neutral-500 font-bold uppercase text-[10px] gap-2"
-                  >
-                    <LayoutDashboard className="h-4 w-4" />
-                    Administrative Portal
-                  </Button>
-                </Link>
+                    {/* Admin Option in Mobile Menu */}
+                    <Link to="/admin/login" onClick={() => setIsOpen(false)}>
+                      <Button
+                        variant="ghost"
+                        className="w-full text-neutral-500 font-bold uppercase text-[10px] gap-2"
+                      >
+                        <LayoutDashboard className="h-4 w-4" />
+                        Administrative Portal
+                      </Button>
+                    </Link>
 
-                <Link to="/register" onClick={() => setIsOpen(false)}>
-                  <Button className="w-full bg-primary-700 text-white font-bold uppercase text-xs py-5">
-                    Register to Vote
-                  </Button>
-                </Link>
+                    <Link to="/register" onClick={() => setIsOpen(false)}>
+                      <Button className="w-full bg-primary-700 text-white font-bold uppercase text-xs py-5">
+                        Register to Vote
+                      </Button>
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </SheetContent>
