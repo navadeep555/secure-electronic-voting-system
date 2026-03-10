@@ -1,243 +1,70 @@
-# Regression Testing Document
+# Regression Testing Strategy and Protocol
 ## Secure Electronic Voting System
 
 ---
 
-# 1. Introduction
+## 1. Executive Summary
+Regression Testing is a vital quality assurance process applied to the **Secure Electronic Voting System**. Its purpose is to ensure that code modifications—such as adding new features (e.g., enhanced biometric models), finalizing bug fixes, or updating foundational libraries—do not inadvertently break or degrade existing, tested functionalities. Given the mission-critical nature of electronic voting, establishing an unyielding regression baseline is paramount for auditing and transparency.
 
-Regression testing is performed to ensure that previously implemented functionalities continue to work correctly after system updates, bug fixes, or the addition of new features.
+## 2. Objective
+- **Sustain Functional Integrity:** Guarantee that older modules (e.g., identity verification, anonymized balloting, cryptographic hashing) function flawlessly after any new codebase merges.
+- **Maintain Security Baselines:** Validate that crucial security protocols (Rate Limiting, PII Hashing, HTTP to HTTPS redirection, JWT verification) continue protecting the system post-update.
+- **Defect Prevention:** Proactively expose hidden side-effects or configuration drifts between React UI, Express Node.js Voting Core, and Flask Biometric API.
 
-In the Secure Electronic Voting System, regression testing was conducted after integrating modules related to voter authentication, vote casting, election configuration, transparency dashboards, and audit verification.
+## 3. Regression Scope and Methodology
+Whenever developers introduce modifications (PRs) to the `main` or `staging` branches, automated CI/CD pipelines alongside manual sanity checks invoke the Regression Test Suite. The scope heavily covers the unchangeable "Golden Workflows" required for the voting lifecycle.
 
-The goal of regression testing is to ensure that system modifications do not negatively affect existing features.
-
----
-
-# 2. Objectives of Regression Testing
-
-The objectives of regression testing are:
-
-- Verify stability of existing features
-- Ensure new updates do not introduce defects
-- Validate integration between modules
-- Maintain security and system integrity
-- Confirm system reliability after code updates
+### Scope Includes:
+1. **Core Authentication Mechanisms:** OTP dispatch, Session token issuance, biometric face encoding matching.
+2. **Blockchain & Database Transactions:** Immutable append-only behavior of the vote tally database and consistency of block hashes.
+3. **Admin Controls:** RBAC (Role-Based Access Control) restrictions preventing non-admins from altering elections.
 
 ---
 
-# 3. Scope of Regression Testing
+## 4. Regression Test Catalog
 
-The regression testing scope included the following modules:
+### 4.1. Identity & Biometric Verification Baseline
+Testing the unchanged dependencies within the Flask API.
 
-- Voter Registration
-- Identity Verification
-- Secure Authentication
-- Multi-Factor Authentication
-- Anonymous Voting
-- Ballot Submission
-- Election Configuration
-- Candidate Management
-- Voter List Management
-- Role Based Access Control
-- Observer Dashboard
-- Audit Logs
-- Result Verification
-- Recount Mechanism
+| Test ID | Scenario | Verification Step | Expected Status | Regression Impact |
+|:---:|---|---|---|---|
+| REG-1.1 | OCR Identification Pass | Pass a known valid ID image through `/api/verify-document`. | Returns valid extracted dictionary. | System Halt |
+| REG-1.2 | OCR Identification Fail | Pass an invalid or blurred document. | Rejects with 400 Bad Request. | System Halt |
+| REG-1.3 | Face Authorization | Submits standard face encoding dataset. | Flask API returns correct mapped User. | System Halt |
 
----
+### 4.2. API Security & Role Based Access Control
+Testing network middleware and token validation via Node.js Express.
 
-# 4. Test Environment
+| Test ID | Scenario | Verification Step | Expected Status | Regression Impact |
+|:---:|---|---|---|---|
+| REG-2.1 | JWT Tempering Attempt | Edit standard payload of valid JWT and request Admin resource. | Middleware detects corrupted signature, returns 401 Unauthorized. | Moderate - Halt |
+| REG-2.2 | Cross-Role Access | Attempt to execute `POST /voting/create-election` logged in as a standard Voter. | Route strictly returns 403 Forbidden. | High Risk |
+| REG-2.3 | MFA Rate Limits | Exceed login attempts past 5/minute. | Returns 429 Too Many Requests; sets timeout header. | High Risk |
 
-| Component | Technology |
-|----------|-------------|
-| Frontend | React |
-| Backend | Flask API |
-| Database | Local data storage |
-| Testing Tools | Postman, Browser Developer Tools |
-| Operating System | macOS |
-| Version Control | GitHub |
+### 4.3. Election State & Integrity Mechanics
+Testing that new dashboard additions or date changes do not skew active election physics.
+
+| Test ID | Scenario | Verification Step | Expected Status | Regression Impact |
+|:---:|---|---|---|---|
+| REG-3.1 | Post-Election Voting Attempt | Voter attempts to post vote against closed ID. | System flags election inactive, blocks logic via Node.js before DB execution. | System Halt |
+| REG-3.2 | Duplicate Cast Request | Simulate same-voter identical POST payload for an active election. | Primary Key constraint OR Controller logic blocks transaction; returns error. | System Halt |
+| REG-3.3 | Cryptographic Tally Hash | Calculate sum of entire DB ledger hash chain. | Last Block's `previous_hash` iteratively resolves back to the Genesis block flawlessly. | System Halt |
 
 ---
 
-# 5. Regression Testing Strategy
+## 5. Automated Regression Tooling
+The regression catalog is managed structurally via Git workflows to minimize engineering overhead.
 
-The regression testing strategy included the following steps:
+| Framework | Domain Tested | Execution Frequency |
+|---|---|---|
+| **PyTest (v9.0)** | Python Backend (Auth, Cryptography) | Nightly Builds & On-Commit. |
+| **Jest / Vitest** | UI Unit Logic & State Management | Nightly Builds & On-Commit. |
+| **Newman (Postman CLI)** | End-to-End API contracts | Pre-Release Merges & Staging Deployments. |
 
-1. Identify modules affected by recent updates.
-2. Select previously executed test cases related to those modules.
-3. Execute regression test cases.
-4. Compare results with expected outcomes.
-5. Report and track any defects found.
-
-Regression testing was conducted after each major system update.
-
----
-
-# 6. Regression Test Cases
-
-## 6.1 Voter Registration
-
-| Test ID | Scenario | Expected Result |
-|--------|-----------|----------------|
-| RT01 | Register voter with valid data | Registration successful |
-| RT02 | Register voter with missing fields | Validation error |
-| RT03 | Register voter with duplicate voter ID | Registration rejected |
-| RT04 | Register voter with invalid date of birth | Error displayed |
-| RT05 | Register voter with invalid constituency | Validation error |
+## 6. Defect Resolution Lifecycle
+1. **Detection:** Should any REG-* test case fail during the automated runs, CI/CD marks the build "Broken".
+2. **Investigation:** Developers must debug the respective microservice container logs via `docker compose logs`.
+3. **Resolution:** Code fixes must include exactly why the regression failed, appending a specific unit test covering the newly discovered edge case before re-merging.
 
 ---
-
-## 6.2 Identity Verification
-
-| Test ID | Scenario | Expected Result |
-|--------|-----------|----------------|
-| RT06 | Admin approves voter identity | Status updated to Approved |
-| RT07 | Admin rejects voter identity | Status updated to Rejected |
-| RT08 | View identity verification status | Correct status displayed |
-
----
-
-## 6.3 Authentication
-
-| Test ID | Scenario | Expected Result |
-|--------|-----------|----------------|
-| RT09 | Login with valid credentials | Login successful |
-| RT10 | Login with incorrect password | Authentication failed |
-| RT11 | Login with invalid username | Error message displayed |
-| RT12 | Login after logout | Authentication required |
-
----
-
-## 6.4 Multi-Factor Authentication
-
-| Test ID | Scenario | Expected Result |
-|--------|-----------|----------------|
-| RT13 | OTP verification with valid OTP | Access granted |
-| RT14 | OTP verification with invalid OTP | Authentication failed |
-| RT15 | OTP expired validation | Verification rejected |
-
----
-
-## 6.5 Voting Module
-
-| Test ID | Scenario | Expected Result |
-|--------|-----------|----------------|
-| RT16 | Cast vote successfully | Vote recorded |
-| RT17 | Duplicate vote attempt | Vote rejected |
-| RT18 | Vote after election close | Voting blocked |
-| RT19 | Vote for invalid candidate | Validation error |
-
----
-
-## 6.6 Ballot Integrity
-
-| Test ID | Scenario | Expected Result |
-|--------|-----------|----------------|
-| RT20 | Verify ballot encryption | Ballot stored encrypted |
-| RT21 | Attempt to modify ballot | Tampering detected |
-
----
-
-## 6.7 Election Configuration
-
-| Test ID | Scenario | Expected Result |
-|--------|-----------|----------------|
-| RT22 | Create election with valid data | Election created |
-| RT23 | Create election with invalid dates | Validation error |
-| RT24 | Update election status | Status updated |
-
----
-
-## 6.8 Candidate Management
-
-| Test ID | Scenario | Expected Result |
-|--------|-----------|----------------|
-| RT25 | Add candidate | Candidate stored |
-| RT26 | Remove candidate | Candidate removed |
-| RT27 | Modify candidate after election start | Modification blocked |
-
----
-
-## 6.9 Voter List Management
-
-| Test ID | Scenario | Expected Result |
-|--------|-----------|----------------|
-| RT28 | Upload voter list | Upload successful |
-| RT29 | Upload invalid voter list format | Error message |
-
----
-
-## 6.10 Role Based Access Control
-
-| Test ID | Scenario | Expected Result |
-|--------|-----------|----------------|
-| RT30 | Voter accessing admin API | Access denied |
-| RT31 | Admin accessing election controls | Access granted |
-
----
-
-## 6.11 Observer Dashboard
-
-| Test ID | Scenario | Expected Result |
-|--------|-----------|----------------|
-| RT32 | Observer views election progress | Data displayed |
-| RT33 | Observer attempts to view sensitive data | Access denied |
-
----
-
-## 6.12 Audit Logs
-
-| Test ID | Scenario | Expected Result |
-|--------|-----------|----------------|
-| RT34 | Retrieve audit logs | Logs displayed |
-| RT35 | Unauthorized audit log access | Access denied |
-
----
-
-## 6.13 Result Verification
-
-| Test ID | Scenario | Expected Result |
-|--------|-----------|----------------|
-| RT36 | Verify election results | Results match ballots |
-| RT37 | Attempt result modification | Operation blocked |
-
----
-
-## 6.14 Recount Mechanism
-
-| Test ID | Scenario | Expected Result |
-|--------|-----------|----------------|
-| RT38 | Perform recount | Results recalculated |
-| RT39 | Compare recount results | Results match original count |
-
----
-
-# 7. Regression Testing Results
-
-| Module | Status |
-|------|-------|
-| Voter Registration | Passed |
-| Authentication | Passed |
-| Voting | Passed |
-| Election Configuration | Passed |
-| Observer Dashboard | Passed |
-| Audit Logs | Passed |
-
-All regression test cases passed successfully.
-
----
-
-# 8. Defects Identified
-
-| Bug ID | Description | Severity | Status |
-|------|-------------|---------|-------|
-| BR01 | Delay in dashboard refresh | Low | Open |
-| BR02 | Minor timestamp mismatch in logs | Low | Under Review |
-
----
-
-# 9. Conclusion
-
-Regression testing confirmed that system updates did not introduce defects into existing modules. All core functionalities of the Secure Electronic Voting System remained stable 
-and operational. 
-
+*Maintained under strict QA Compliance.*
