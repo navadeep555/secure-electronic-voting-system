@@ -75,6 +75,7 @@ def roles_required(allowed_roles):
                     return jsonify(success=False, message="Permission denied"), 403
                 
                 request.user = decoded 
+                request.voter = decoded # Added to support cast_vote which expects request.voter
                 return f(*args, **kwargs)
                 
             except jwt.ExpiredSignatureError:
