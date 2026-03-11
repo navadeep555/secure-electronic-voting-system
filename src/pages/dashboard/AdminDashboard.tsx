@@ -260,7 +260,21 @@ export default function AdminDashboard() {
                       {dbElections.map((e) => {
                         const now = Math.floor(Date.now() / 1000);
                         const isCompleted =
-                          now > e.end_time || e.status === "CLOSED";
+                          (now > e.end_time && e.status !== "DRAFT") || e.status === "CLOSED";
+
+                        let displayStatus = e.status;
+                        let statusColor = "bg-neutral-100 text-neutral-800";
+
+                        if (isCompleted) {
+                          displayStatus = "CLOSED";
+                          statusColor = "bg-neutral-200 text-neutral-800";
+                        } else if (e.status === "ACTIVE") {
+                          statusColor = "bg-green-100 text-green-700";
+                        } else if (e.status === "PAUSED") {
+                          statusColor = "bg-orange-100 text-orange-800";
+                        } else if (e.status === "DRAFT") {
+                          statusColor = "bg-blue-100 text-blue-800";
+                        }
 
                         return (
                           <div
@@ -277,9 +291,9 @@ export default function AdminDashboard() {
                                 <div className="flex items-center gap-2">
                                   <h3 className="font-bold">{e.title}</h3>
                                   <span
-                                    className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${e.status === "ACTIVE" ? "bg-green-100 text-green-700" : "bg-gray-200"}`}
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${statusColor}`}
                                   >
-                                    {e.status}
+                                    {displayStatus}
                                   </span>
                                   {e.results_published === 1 && (
                                     <span className="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded flex items-center gap-1">
