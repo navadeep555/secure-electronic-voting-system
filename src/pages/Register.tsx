@@ -181,6 +181,7 @@ interface DocumentUpload {
   aadhaarPreview: string;
   voterIdPreview: string;
   voterIdVerified: boolean;
+  aadhaarVerified: boolean;
 }
 
 interface BiometricData {
@@ -207,6 +208,7 @@ export default function Register() {
     aadhaarPreview: "",
     voterIdPreview: "",
     voterIdVerified: false,
+    aadhaarVerified: false,
   });
 
   const [isVerifying, setIsVerifying] = useState(false);
@@ -551,12 +553,13 @@ export default function Register() {
   const validateStep2 = () =>
     documentUpload.aadhaarFile &&
     documentUpload.voterIdFile &&
-    documentUpload.voterIdVerified;
+    documentUpload.voterIdVerified &&
+    documentUpload.aadhaarVerified;
 
   const handleNextStep = () => {
     if (currentStep === 1 && !validateStep1()) return;
     if (currentStep === 2 && !validateStep2()) {
-      alert("Please upload both documents and ensure Voter ID is verified.");
+      alert("Please upload both documents and ensure they are successfully verified.");
       return;
     }
     if (currentStep < 4) setCurrentStep(currentStep + 1);
@@ -607,25 +610,36 @@ export default function Register() {
           [field]: file,
           [field === "aadhaarFile" ? "aadhaarPreview" : "voterIdPreview"]:
             base64Image,
-          ...(field === "voterIdFile" ? { voterIdVerified: false } : {}),
+          ...(field === "voterIdFile" ? { voterIdVerified: false } : { aadhaarVerified: false }),
         }));
 
-        if (field === "voterIdFile") {
-          setIsVerifying(true);
-          try {
-            const result = await verifyDocument(
-              base64Image,
-              personalInfo.fullName,
-              personalInfo.dateOfBirth,
-            );
-            if (result.success)
-              setDocumentUpload((prev) => ({ ...prev, voterIdVerified: true }));
-            else setVerificationError(result.message);
-          } catch {
-            setVerificationError("Verification failed.");
-          } finally {
-            setIsVerifying(false);
+        setIsVerifying(true);
+        try {
+          // Document type logic
+          const isAadhaar = field === "aadhaarFile";
+          
+          const result = await verifyDocument(
+            base64Image,
+            personalInfo.fullName,
+            personalInfo.dateOfBirth,
+            isAadhaar ? "aadhaar" : "voterId",
+            isAadhaar ? personalInfo.aadhaarNumber : undefined
+          );
+          
+          if (result.success) {
+            setDocumentUpload((prev) => ({ 
+              ...prev, 
+              [isAadhaar ? "aadhaarVerified" : "voterIdVerified"]: true 
+            }));
+            // Clear any previous verification error
+            setVerificationError("");
+          } else {
+            setVerificationError(result.message);
           }
+        } catch {
+          setVerificationError("Verification failed.");
+        } finally {
+          setIsVerifying(false);
         }
       };
       reader.readAsDataURL(file);
@@ -986,7 +1000,7 @@ export default function Register() {
                                       {doc.file.name}
                                     </p>
                                     {doc.id === "voter" &&
-                                      (isVerifying ? (
+                                      (isVerifying && doc.field === "voterIdFile" ? (
                                         <p className="text-xs text-amber-600 mt-1">
                                           Verifying...
                                         </p>
@@ -994,7 +1008,21 @@ export default function Register() {
                                         <p className="text-xs text-green-700 mt-1 font-bold">
                                           Verified Official Document
                                         </p>
-                                      ) : verificationError ? (
+                                      ) : verificationError && doc.field === "voterIdFile" ? (
+                                        <p className="text-xs text-red-600 mt-1">
+                                          {verificationError}
+                                        </p>
+                                      ) : null)}
+                                    {doc.id === "aadhaar" &&
+                                      (isVerifying && doc.field === "aadhaarFile" ? (
+                                        <p className="text-xs text-amber-600 mt-1">
+                                          Verifying...
+                                        </p>
+                                      ) : documentUpload.aadhaarVerified ? (
+                                        <p className="text-xs text-green-700 mt-1 font-bold">
+                                          Verified Official Document
+                                        </p>
+                                      ) : verificationError && doc.field === "aadhaarFile" ? (
                                         <p className="text-xs text-red-600 mt-1">
                                           {verificationError}
                                         </p>

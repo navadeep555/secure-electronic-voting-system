@@ -123,10 +123,12 @@ import Tesseract from 'tesseract.js';
 export async function verifyDocument(
   documentImage: string,
   name: string,
-  dob: string
+  dob: string,
+  documentType: "voterId" | "aadhaar" = "voterId",
+  aadhaarNumber?: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    console.log("🔍 Starting local OCR verification...");
+    console.log(`🔍 Starting local OCR verification for ${documentType}...`);
 
     // Tesseract.js recognizes base64 images directly
     const result = await Tesseract.recognize(
@@ -139,23 +141,58 @@ export async function verifyDocument(
     console.log("📝 Extracted OCR Text:", text.substring(0, 200) + "...");
 
     // Keywords for Voter ID (EPIC) and Aadhaar card
-    const VALID_KEYWORDS = [
-      "ELECTION", "ELECTORAL", "IDENTITY", "VOTER", "EPIC",
-      "AADHAAR", "UIDAI", "UNIQUE IDENTIFICATION", "GOVERNMENT"
-    ];
+    const VALID_KEYWORDS = documentType === "voterId" 
+      ? ["ELECTION", "ELECTORAL", "IDENTITY", "VOTER", "EPIC"]
+      : ["AADHAAR", "UIDAI", "UNIQUE IDENTIFICATION", "GOVERNMENT"];
 
-    const matched = VALID_KEYWORDS.some(kw => text.includes(kw));
+    const matchedKeyword = VALID_KEYWORDS.some(kw => text.includes(kw));
 
-    if (matched) {
-      console.log("✅ Document verified successfully.");
+    const nameParts = name.toUpperCase().split(/\s+/).filter(part => part.length > 0);
+    // Be slightly forgiving if name is empty, though UI validates it
+    const isNameMatched = nameParts.length === 0 || nameParts.every(part => text.includes(part));
+
+    let isNumberMatched = true;
+    if (documentType === "aadhaar" && aadhaarNumber) {
+      // Aadhaar number in OCR might have spaces, dashes, etc.
+      const cleanAadhaar = aadhaarNumber.replace(/\D/g, "");
+      // Look for the 12 digit number in the text, allowing for spaces in between
+      // e.g. "1234 5678 9012"
+      const aadhaarVariants = [
+        cleanAadhaar,
+        `${cleanAadhaar.slice(0, 4)} ${cleanAadhaar.slice(4, 8)} ${cleanAadhaar.slice(8, 12)}`
+      ];
+      isNumberMatched = aadhaarVariants.some(variant => text.replace(/\s+/g, "").includes(cleanAadhaar) || text.includes(variant));
+    }
+
+
+    if (matchedKeyword && isNameMatched && isNumberMatched) {
+      console.log(`✅ ${documentType} verified successfully.`);
       return { success: true, message: "Document verified" };
     }
 
-    console.warn("❌ Document verification failed - keywords not found.");
-    return {
-      success: false,
-      message: "Could not verify document. Ensure it is a valid Voter ID or Aadhaar card."
-    };
+    if (!matchedKeyword) {
+      console.warn(`❌ ${documentType} verification failed - keywords not found.`);
+      return {
+        success: false,
+        message: `Could not verify document. Ensure it is a valid ${documentType === "voterId" ? "Voter ID" : "Aadhaar card"}.`
+      };
+    }
+
+    if (!isNameMatched) {
+      console.warn(`❌ ${documentType} verification failed - name mismatch. OCR didn't find the registered name`);
+      return {
+        success: false,
+        message: `Could not verify document. Document name does not match the registered Full Name (${name}).`
+      };
+    }
+
+    if (!isNumberMatched) {
+      console.warn(`❌ ${documentType} verification failed - Aadhaar number mismatch.`);
+      return {
+        success: false,
+        message: `Could not verify document. Aadhaar number does not match registered number.`
+      };
+    }
 
   } catch (error) {
     console.error("❌ OCR processing error:", error);
