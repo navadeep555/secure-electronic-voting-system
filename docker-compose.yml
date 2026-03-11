@@ -17,6 +17,24 @@ services:
       - ./backend/.env
     ports:
       - "5000:5000"
+    depends_on:
+      - postgres
+    networks:
+      - voting-net
+
+  # -------------------------------
+  # PostgreSQL Database
+  # -------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: voting-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: voting
+      POSTGRES_PASSWORD: voting123
+      POSTGRES_DB: votingdb
+    ports:
+      - "5432:5432"
     networks:
       - voting-net
 

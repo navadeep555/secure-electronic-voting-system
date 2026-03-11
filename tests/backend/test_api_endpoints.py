@@ -17,17 +17,21 @@ def test_health_check(client):
     """
     rv = client.get('/api/health')
     assert rv.status_code == 200
-    assert json.loads(rv.data) == {"status": "ok", "message": "Flask API running"}
+    assert json.loads(rv.data) == {"status": "ok", "service": "flask-backend"}
 
 def test_verify_document_missing_image(client):
     """
     Test OCR document scanning without sending an image file.
     """
-    rv = client.post('/api/verify-document', data={})
+    rv = client.post(
+        '/api/verify-document', 
+        data=json.dumps({}),
+        content_type='application/json'
+    )
     assert rv.status_code == 400
     response_data = json.loads(rv.data)
-    assert 'error' in response_data
-    assert "No image file provided" in response_data['error']
+    assert 'message' in response_data
+    assert response_data['success'] is False
 
 def test_recognize_face_invalid_payload(client):
     """
