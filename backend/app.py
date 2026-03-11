@@ -41,6 +41,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from auth import voter_required, roles_required
 from functools import wraps
+import requests
 from flask_talisman import Talisman
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -725,7 +726,7 @@ def register_face():
             return jsonify(success=False, message="Missing ID or Phone"), 400
             
         uid = compute_hash(str(raw_uid))
-        phone = compute_hash(str(raw_phone))
+        phone = encrypt_data(str(raw_phone))
         
         images = data.get("faceImages", [])
         if data.get("faceImage"):
@@ -844,24 +845,27 @@ def recognize_face():
     otp = str(random.randint(100000, 999999))
     encrypted_otp = encrypt_data(otp)
     conn = get_db()
+    
+    # 1. Fetch user's encrypted phone number to send SMS
+    cur = db_execute(conn, "SELECT phone_hash FROM users WHERE user_id_hash=%s", (uid,))
+    user_record = cur.fetchone()
+    if user_record and user_record['phone_hash']:
+        phone_number = decrypt_data(user_record['phone_hash'])
+        # 2. Call 2factor.in API to send the OTP
+        try:
+            api_key = os.environ.get("TWOFACTOR_API_KEY", "b60525fc-e55d-11f0-a6b2-0200cd936042")
+            requests.get(f"https://2factor.in/API/V1/{api_key}/SMS/{phone_number}/{otp}", timeout=5)
+            print(f"[OK] OTP SMS sent successfully to {phone_number} via 2factor.in")
+        except Exception as e:
+            print(f"[ERROR] Failed to send SMS via 2factor.in: {e}")
+
     db_execute(conn, "UPDATE users SET otp=%s, otp_time=%s WHERE user_id_hash=%s", (encrypted_otp, int(time.time()), uid))
     conn.commit()
     conn.close()
 
-    if app.debug:
-        # Prominent display for local developers
-        print("\n" + "="*40)
-        print(f"🔥 [LOCAL DEBUG OTP] 🔥")
-        print(f"USER: {uid}")
-        print(f"OTP:  {otp}")
-        print("="*40 + "\n", flush=True)
-    else:
-        # Standard logging for production/Docker
-        print(f"[OK] Recognition Success for {uid}. OTP: {otp}", flush=True)
+    print(f"[OK] Recognition Success for {uid}. OTP Generated.", flush=True)
 
-    response_data = {"success": True, "userIdHash": uid, "otp": otp}
-    if app.debug:
-        response_data["debug_otp"] = otp
+    response_data = {"success": True, "userIdHash": uid}
     return jsonify(response_data)
 
 
