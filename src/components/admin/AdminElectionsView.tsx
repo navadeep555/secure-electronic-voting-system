@@ -98,12 +98,15 @@ export function AdminElectionsView() {
       }
 
       // 2. Convert "2026-02-21" string to Unix Integer
-      const startUnix = Math.floor(
-        new Date(newElection.startDate).getTime() / 1000,
-      );
-      const endUnix = Math.floor(
-        new Date(newElection.endDate).getTime() / 1000,
-      );
+      const startDateObj = new Date(newElection.startDate);
+      // Start of the day
+      startDateObj.setHours(0, 0, 0, 0);
+      const startUnix = Math.floor(startDateObj.getTime() / 1000);
+
+      const endDateObj = new Date(newElection.endDate);
+      // End of the selected day
+      endDateObj.setHours(23, 59, 59, 999);
+      const endUnix = Math.floor(endDateObj.getTime() / 1000);
 
       // 3. Prevent sending 'None' to Flask
       if (isNaN(startUnix) || isNaN(endUnix)) {
@@ -232,7 +235,11 @@ export function AdminElectionsView() {
 
   const getStatusDisplay = (status: string, endTime: number) => {
     const now = Math.floor(Date.now() / 1000);
-    if (now > endTime && status !== "DRAFT")
+    // An election is closed if its status is literally "CLOSED", 
+    // or if it has a valid end time in the past and isn't a draft.
+    const isCompleted = (endTime > 0 && now > endTime && status !== "DRAFT") || status === "CLOSED";
+
+    if (isCompleted)
       return {
         label: "CLOSED",
         color: "bg-neutral-100 text-neutral-800 border-neutral-200",
